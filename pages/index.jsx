@@ -765,17 +765,34 @@ export default function HireL() {
   // 데이터 Firebase에 올리기
   const pushToRoom = async (rid, data) => {
     try {
+      // 용량 최소화: files(PDF base64) 제거, resume 500자 제한
+      const slim = {
+        positions: data.positions.map(p => ({ id: p.id, name: p.name, colorIdx: p.colorIdx, jd: (p.jd||"").slice(0, 300) })),
+        candidates: data.candidates.map(c => ({
+          id: c.id, positionId: c.positionId, name: c.name, age: c.age,
+          fileNames: c.fileNames || [],
+          resume: (c.resume||"").slice(0, 300),
+          files: [],
+          analysis: c.analysis ? {
+            totalScore: c.analysis.totalScore,
+            scores: c.analysis.scores,
+            verdict: c.analysis.verdict,
+            summary: c.analysis.summary,
+            strengths: c.analysis.strengths,
+            weaknesses: c.analysis.weaknesses,
+            keywords: (c.analysis.keywords||[]).slice(0, 10),
+            interviewQuestions: c.analysis.interviewQuestions,
+          } : null,
+        })),
+        updatedAt: Date.now(),
+      };
       const res = await fetch(`/api/sync?roomId=${rid}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          positions: data.positions, 
-          candidates: data.candidates.map(c => ({ ...c, files: [] })), // files 제외 (용량)
-          updatedAt: Date.now() 
-        }),
+        body: JSON.stringify(slim),
       });
       if (res.ok) setSyncStatus("connected");
-      else setSyncStatus("error");
+      else { console.error("sync push failed:", res.status); setSyncStatus("error"); }
     } catch (e) { console.error("push error:", e); setSyncStatus("error"); }
   };
 
