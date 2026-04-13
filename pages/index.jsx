@@ -38,12 +38,18 @@ const scHex=(s)=>s>=75?"#10B981":s>=50?"#3B82F6":s>=30?"#F59E0B":"#EF4444";
 
 // ─── AI call (via /api/chat proxy) ───────────────────────────────────────────
 async function callAI(body) {
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1500, ...body }),
-  });
-  return res.json();
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1500, ...body }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch (e) {
+    console.error("API 호출 오류:", e);
+    throw e;
+  }
 }
 
 async function analyzeResume(jd, candidate) {
@@ -645,10 +651,16 @@ export default function HireL() {
 
   const doAnalyze = async (c) => {
     const pos = positions.find(p => p.id === c.positionId);
-    if (!pos) return;
+    if (!pos) { showToast("포지션을 찾을 수 없습니다", "error"); return; }
     setAnalyzingIds(p => new Set(p).add(c.id));
-    try { const r = await analyzeResume(pos.jd, c); setCandidates(p => p.map(x => x.id === c.id ? { ...x, analysis: r } : x)); }
-    catch (e) { console.error(e); }
+    try {
+      const r = await analyzeResume(pos.jd, c);
+      setCandidates(p => p.map(x => x.id === c.id ? { ...x, analysis: r } : x));
+      showToast(`${c.name} 분석 완료 — ${r.totalScore}점 ${r.verdict}`);
+    } catch (e) {
+      console.error("분석 오류:", e);
+      showToast(`분석 실패: API 키를 확인해주세요`, "error");
+    }
     setAnalyzingIds(p => { const s = new Set(p); s.delete(c.id); return s; });
   };
 
@@ -977,44 +989,70 @@ export default function HireL() {
       {/* Add Candidate Modal */}
       {showAddCandidate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }}>
-          <div style={{ background: C.card, borderRadius: 18, border: `1px solid ${C.border}`, padding: 28, width: 500, maxWidth: "95vw", maxHeight: "88vh", overflowY: "auto" }}>
+          <div style={{ background: C.card, borderRadius: 18, border: `1px solid ${C.border}`, padding: 28, width: 520, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>후보자 등록</h3>
               <button onClick={() => setShowAddCandidate(false)} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer", fontSize: 20 }}>✕</button>
             </div>
-            {positions.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "30px 0" }}>
-                <div style={{ fontSize: 14, color: C.sub, marginBottom: 14 }}>먼저 포지션을 추가해주세요</div>
-                <button onClick={() => { setShowAddCandidate(false); setShowPositionModal(true); }} style={BP()}>+ 포지션 추가</button>
+
+            {/* 포지션 선택 + 인라인 추가 */}
+            <label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 8 }}>포지션 선택 *</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              {positions.map(pos => {
+                const rc = ROLE_COLORS[pos.colorIdx || 0];
+                const s = addForm.positionId === pos.id;
+                return (<button key={pos.id} onClick={() => setAddForm(p => ({ ...p, positionId: pos.id, showNewPos: false }))} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 9, border: `1px solid ${s ? rc.accent : C.border}`, background: s ? rc.glow : C.surface, color: s ? rc.accent : C.sub, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, transition: "all .15s" }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: rc.accent }} />{pos.name}
+                </button>);
+              })}
+              {/* 새 포지션 인라인 추가 버튼 */}
+              <button onClick={() => setAddForm(p => ({ ...p, showNewPos: !p.showNewPos, positionId: "" }))}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: `1px dashed ${addForm.showNewPos ? C.accent : C.borderL}`, background: addForm.showNewPos ? C.glow : "transparent", color: addForm.showNewPos ? C.accent : C.muted, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500 }}>
+                + 새 포지션
+              </button>
+            </div>
+
+            {/* 새 포지션 인라인 폼 */}
+            {addForm.showNewPos && (
+              <div style={{ background: C.surface, borderRadius: 12, border: `1px solid ${C.accent}40`, padding: 16, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.accent, marginBottom: 12 }}>✦ 새 포지션 만들기</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, marginBottom: 10 }}>
+                  <input value={addForm.newPosName || ""} onChange={e => setAddForm(p => ({ ...p, newPosName: e.target.value }))} placeholder="포지션명 (예: 마케터)" style={{ ...IS }} />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {ROLE_COLORS.map((rc, i) => (
+                      <div key={i} onClick={() => setAddForm(p => ({ ...p, newPosColorIdx: i }))} style={{ width: 22, height: 22, borderRadius: "50%", background: rc.accent, cursor: "pointer", border: `2px solid ${(addForm.newPosColorIdx ?? 0) === i ? "#fff" : "transparent"}`, flexShrink: 0 }} />
+                    ))}
+                  </div>
+                </div>
+                <textarea value={addForm.newPosJd || ""} onChange={e => setAddForm(p => ({ ...p, newPosJd: e.target.value }))} placeholder="채용 공고 (JD) 입력..." rows={5} style={{ ...IS, resize: "vertical", marginBottom: 10 }} />
+                <button onClick={() => {
+                  if (!addForm.newPosName || !addForm.newPosJd) return;
+                  const np = { id: `p${Date.now()}`, name: addForm.newPosName, jd: addForm.newPosJd, colorIdx: addForm.newPosColorIdx ?? 0 };
+                  setPositions(p => [...p, np]);
+                  setAddForm(p => ({ ...p, positionId: np.id, showNewPos: false, newPosName: "", newPosJd: "", newPosColorIdx: 0 }));
+                  showToast(`포지션 "${np.name}" 추가됨`);
+                }} style={{ ...BP(), width: "100%", fontSize: 13, padding: "9px", opacity: (addForm.newPosName && addForm.newPosJd) ? 1 : .4 }}>
+                  포지션 저장 후 선택
+                </button>
               </div>
-            ) : (<>
-              <label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 6 }}>포지션 선택 *</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-                {positions.map(pos => {
-                  const rc = ROLE_COLORS[pos.colorIdx || 0];
-                  const s = addForm.positionId === pos.id;
-                  return (<button key={pos.id} onClick={() => setAddForm(p => ({ ...p, positionId: pos.id }))} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 9, border: `1px solid ${s ? rc.accent : C.border}`, background: s ? rc.glow : C.surface, color: s ? rc.accent : C.sub, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, transition: "all .15s" }}>
-                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: rc.accent }} />{pos.name}
-                  </button>);
-                })}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11, marginBottom: 16 }}>
-                <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>이름 *</label><input value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} placeholder="홍길동" style={IS} /></div>
-                <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>나이</label><input value={addForm.age} onChange={e => setAddForm(p => ({ ...p, age: e.target.value }))} placeholder="30" type="number" style={IS} /></div>
-              </div>
-              <div style={{ display: "flex", background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}`, marginBottom: 13 }}>
-                {[["file", "📎 파일 업로드"], ["text", "✏️ 텍스트 입력"]].map(([m, l]) => (
-                  <button key={m} onClick={() => setAddForm(p => ({ ...p, inputMode: m }))} style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "none", fontSize: 13, fontWeight: 500, background: addForm.inputMode === m ? C.accent : "transparent", color: addForm.inputMode === m ? "#fff" : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{l}</button>
-                ))}
-              </div>
-              {addForm.inputMode === "file" && <UploadZone onReady={setUploadedFiles} />}
-              {addForm.inputMode === "text" && <textarea value={addForm.resume} onChange={e => setAddForm(p => ({ ...p, resume: e.target.value }))} placeholder="이력서 내용 붙여넣기..." rows={7} style={{ ...IS, resize: "vertical" }} />}
-              <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
-                <button onClick={addCandidate} disabled={!addForm.name || !addForm.positionId || (addForm.inputMode === "file" && !uploadedFiles.length) || (addForm.inputMode === "text" && !addForm.resume)}
-                  style={{ ...BP(), flex: 1, opacity: (!addForm.name || !addForm.positionId) ? .4 : 1 }}>✦ AI 분석 시작</button>
-                <button onClick={() => setShowAddCandidate(false)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9, color: C.sub, padding: "10px 16px", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>취소</button>
-              </div>
-            </>)}
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11, marginBottom: 16 }}>
+              <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>이름 *</label><input value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} placeholder="홍길동" style={IS} /></div>
+              <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>나이</label><input value={addForm.age} onChange={e => setAddForm(p => ({ ...p, age: e.target.value }))} placeholder="30" type="number" style={IS} /></div>
+            </div>
+            <div style={{ display: "flex", background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}`, marginBottom: 13 }}>
+              {[["file", "📎 파일 업로드"], ["text", "✏️ 텍스트 입력"]].map(([m, l]) => (
+                <button key={m} onClick={() => setAddForm(p => ({ ...p, inputMode: m }))} style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "none", fontSize: 13, fontWeight: 500, background: addForm.inputMode === m ? C.accent : "transparent", color: addForm.inputMode === m ? "#fff" : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{l}</button>
+              ))}
+            </div>
+            {addForm.inputMode === "file" && <UploadZone onReady={setUploadedFiles} />}
+            {addForm.inputMode === "text" && <textarea value={addForm.resume} onChange={e => setAddForm(p => ({ ...p, resume: e.target.value }))} placeholder="이력서 내용 붙여넣기..." rows={7} style={{ ...IS, resize: "vertical" }} />}
+            <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
+              <button onClick={addCandidate} disabled={!addForm.name || !addForm.positionId || (addForm.inputMode === "file" && !uploadedFiles.length) || (addForm.inputMode === "text" && !addForm.resume)}
+                style={{ ...BP(), flex: 1, opacity: (!addForm.name || !addForm.positionId) ? .4 : 1 }}>✦ AI 분석 시작</button>
+              <button onClick={() => setShowAddCandidate(false)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9, color: C.sub, padding: "10px 16px", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>취소</button>
+            </div>
           </div>
         </div>
       )}
