@@ -42,7 +42,7 @@ async function callAI(body) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1500, ...body }),
+      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1500, ...body }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
