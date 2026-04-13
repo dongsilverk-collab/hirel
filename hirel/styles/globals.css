@@ -1,0 +1,16 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #070B12; color: #F1F5F9; font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', 'Pretendard', sans-serif; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #0C1220; }
+::-webkit-scrollbar-thumb { background: #213550; border-radius: 2px; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@media print {
+  body { background: #ffffff !important; color: #111111 !important; }
+  .no-print { display: none !important; }
+  .print-page { page-break-after: always; }
+}
