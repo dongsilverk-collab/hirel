@@ -271,7 +271,7 @@ function exportCandidatePDF(candidate, position) {
       if (Array.isArray(iq)) {
         return iq.map((q, i) => `<div style="display:flex;gap:12px;padding:12px 16px;border-radius:8px;background:#f9fafb;border:1px solid #e5e7eb;margin-bottom:9px"><span style="min-width:24px;height:24px;border-radius:6px;background:#eff6ff;color:#3B82F6;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">Q${i+1}</span><span style="font-size:13px;color:#374151;line-height:1.6;padding-top:3px">${q}</span></div>`).join("");
       }
-      const sections = [["🧡 인성/컬쳐핏", iq.culture||[], "#F59E0B"], ["💼 직무 역량", iq.skill||[], "#3B82F6"], ["🚀 미래/방향성", iq.future||[], "#8B5CF6"]];
+      const sections = [["🧡 인성/컬쳐핏", iq.culture||[], "#F59E0B"], ["💼 직무 역량", iq.skill||[], "#3B82F6"], ["🚀 미래/방향성", iq.future||[], "#8B5CF6"], ["⚠️ 킬패스/단점", iq.killpath||[], "#EF4444"], ["💡 자기계발", iq.growth||[], "#10B981"], ["📊 데이터 실전능력", iq.dataSkill||[], "#0EA5E9"], ["⚡ 실행력", iq.execution||[], "#F97316"]];
       return sections.map(([label, qs, color]) => `
         <div style="margin-bottom:14px">
           <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:8px;padding:2px 8px;background:${color}18;border-radius:5px;display:inline-block">${label}</div>
@@ -522,9 +522,9 @@ function InterviewRoom({ candidate, position, onBack }) {
           {/* 구조화된 10개 질문 */}
           {(questions || legacyQ) && (
             <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 12 }}>💬 면접 질문 {questions ? "10개" : ""}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 12 }}>💬 면접 질문 20개</div>
               {questions ? (<>
-                {[["🧡 인성/컬쳐핏", questions.culture||[], C.amber], ["💼 직무 역량", questions.skill||[], C.accent], ["🚀 미래/방향성", questions.future||[], C.purple]].map(([label, qs, color]) => (
+                {[["🧡 인성/컬쳐핏", questions.culture||[], C.amber], ["💼 직무 역량", questions.skill||[], C.accent], ["🚀 미래/방향성", questions.future||[], C.purple], ["⚠️ 킬패스/단점", questions.killpath||[], C.red], ["💡 자기계발", questions.growth||[], C.green], ["📊 데이터 실전능력", questions.dataSkill||[], C.teal], ["⚡ 실행력", questions.execution||[], "#F97316"]].map(([label, qs, color]) => (
                   <div key={label} style={{ marginBottom: 14 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 7, padding: "3px 8px", background: `${color}15`, borderRadius: 6, display: "inline-block" }}>{label}</div>
                     {qs.map((q, i) => (
@@ -1201,13 +1201,13 @@ export default function HireL() {
                     {activeTab === "interview" && (
                       <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 24 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-                          <div><h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>AI 추천 면접 질문 10개</h3><p style={{ fontSize: 12, color: C.sub, margin: 0 }}>큐라엘 컬쳐핏 기반 맞춤 생성</p></div>
+                          <div><h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>AI 추천 면접 질문 20개</h3><p style={{ fontSize: 12, color: C.sub, margin: 0 }}>큐라엘 컬쳐핏 기반 맞춤 생성</p></div>
                           <button onClick={() => { setInterviewCandidateId(c.id); setView("interview"); }} style={{ ...BP(`linear-gradient(135deg,${C.purple},${C.pink})`), padding: "8px 16px", fontSize: 13 }}>🎤 면접 시작</button>
                         </div>
                         {(() => {
                           const iq = a.interviewQuestions;
                           if (iq && typeof iq === "object" && !Array.isArray(iq)) {
-                            return [["🧡 인성/컬쳐핏", iq.culture||[], C.amber], ["💼 직무 역량", iq.skill||[], C.accent], ["🚀 미래/방향성", iq.future||[], C.purple]].map(([label, qs, color]) => (
+                            return [["🧡 인성/컬쳐핏", iq.culture||[], C.amber], ["💼 직무 역량", iq.skill||[], C.accent], ["🚀 미래/방향성", iq.future||[], C.purple], ["⚠️ 킬패스/단점", iq.killpath||[], C.red], ["💡 자기계발", iq.growth||[], C.green], ["📊 데이터 실전능력", iq.dataSkill||[], C.teal], ["⚡ 실행력", iq.execution||[], "#F97316"]].map(([label, qs, color]) => (
                               <div key={label} style={{ marginBottom: 16 }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 8, padding: "3px 9px", background: `${color}15`, borderRadius: 6, display: "inline-block" }}>{label}</div>
                                 {qs.map((q, i) => (
