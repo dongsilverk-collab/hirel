@@ -880,7 +880,11 @@ export default function HireL() {
       showToast(`${c.name} 분석 완료 — ${r.totalScore}점 ${r.verdict}`);
     } catch (e) {
       console.error("분석 오류:", e);
-      showToast(`분석 실패: API 키를 확인해주세요`, "error");
+      const msg = e?.message || String(e);
+      if (msg.includes("401")) showToast("API 키 오류 (401) — 키를 다시 확인해주세요", "error");
+      else if (msg.includes("429")) showToast("크레딧 부족 (429) — 충전이 필요해요", "error");
+      else if (msg.includes("JSON")) showToast("AI 응답 파싱 오류 — 다시 시도해주세요", "error");
+      else showToast(`분석 실패: ${msg.slice(0, 60)}`, "error");
     }
     setAnalyzingIds(p => { const s = new Set(p); s.delete(c.id); return s; });
   };
