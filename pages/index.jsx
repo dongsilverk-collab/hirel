@@ -737,12 +737,13 @@ export default function HireL() {
   const [roomId, setRoomId] = useState(null);
   const [isRoomHost, setIsRoomHost] = useState(false);
   const [syncEnabled, setSyncEnabled] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | connected | error
   const pollRef = useRef(null);
-  const isSyncingRef = useRef(false);
+  const lastPushRef = useRef(0);
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
-  // URL에서 roomId 읽기 (팀원이 링크 접속 시)
+  // URL에서 roomId 읽기 (팀원)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const rid = params.get("room");
@@ -750,9 +751,9 @@ export default function HireL() {
       setRoomId(rid);
       setIsRoomHost(false);
       setSyncEnabled(true);
-      showToast(`🔗 공유 룸 연결됨 — 실시간 동기화 중`);
+      setSyncStatus("syncing");
+      showToast(`🔗 공유 룸 연결 중... 룸코드: ${rid}`);
     } else {
-      // 로컬 데이터 불러오기
       try {
         const saved = localStorage.getItem("hirel_data");
         if (saved) { const d = JSON.parse(saved); setPositions(d.positions || []); setCandidates(d.candidates || []); }
@@ -761,69 +762,78 @@ export default function HireL() {
     }
   }, []);
 
+  // 데이터 Firebase에 올리기
+  const pushToRoom = async (rid, data) => {
+    try {
+      const res = await fetch(`/api/sync?roomId=${rid}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          positions: data.positions, 
+          candidates: data.candidates.map(c => ({ ...c, files: [] })), // files 제외 (용량)
+          updatedAt: Date.now() 
+        }),
+      });
+      if (res.ok) setSyncStatus("connected");
+      else setSyncStatus("error");
+    } catch (e) { console.error("push error:", e); setSyncStatus("error"); }
+  };
+
+  // Firebase에서 가져오기
+  const pullFromRoom = async (rid) => {
+    try {
+      const res = await fetch(`/api/sync?roomId=${rid}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.positions && data.candidates) {
+        setPositions(data.positions);
+        setCandidates(data.candidates);
+        setSyncStatus("connected");
+      }
+    } catch (e) { console.error("pull error:", e); }
+  };
+
   // 룸 생성 (호스트)
   const createRoom = async () => {
     const rid = Math.random().toString(36).slice(2, 8).toUpperCase();
     setRoomId(rid);
     setIsRoomHost(true);
     setSyncEnabled(true);
-    // 현재 데이터 업로드
+    setSyncStatus("syncing");
+    // 현재 데이터 즉시 업로드
     await pushToRoom(rid, { positions, candidates });
     const shareUrl = `${window.location.origin}?room=${rid}`;
-    await navigator.clipboard.writeText(shareUrl).catch(() => {});
-    showToast(`📋 링크 복사됨! 룸코드: ${rid}`);
+    try { await navigator.clipboard.writeText(shareUrl); } catch(e) {}
+    showToast(`✓ 공유 시작! 룸코드: ${rid} — 링크 복사됨`);
   };
 
-  const pushToRoom = async (rid, data) => {
-    if (isSyncingRef.current) return;
-    try {
-      await fetch(`/api/sync?roomId=${rid}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ positions: data.positions, candidates: data.candidates, updatedAt: Date.now() }),
-      });
-    } catch (e) { console.error("sync push error:", e); }
-  };
-
-  const pullFromRoom = async (rid) => {
-    try {
-      const res = await fetch(`/api/sync?roomId=${rid}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!data || !data.positions) return;
-      isSyncingRef.current = true;
-      setPositions(data.positions || []);
-      setCandidates(data.candidates || []);
-      setTimeout(() => { isSyncingRef.current = false; }, 500);
-    } catch (e) { console.error("sync pull error:", e); }
-  };
-
-  // 호스트: 데이터 변경 시 룸에 push
+  // 호스트: 데이터 변경 시 자동 push (1초 디바운스)
   useEffect(() => {
-    if (syncEnabled && isRoomHost && roomId && !isSyncingRef.current) {
-      if (positions.length > 0 || candidates.length > 0) {
-        pushToRoom(roomId, { positions, candidates });
+    if (!syncEnabled || !isRoomHost || !roomId) {
+      if (!syncEnabled && (positions.length > 0 || candidates.length > 0)) {
         localStorage.setItem("hirel_data", JSON.stringify({ positions, candidates }));
       }
-    } else if (!syncEnabled && (positions.length > 0 || candidates.length > 0)) {
-      localStorage.setItem("hirel_data", JSON.stringify({ positions, candidates }));
+      return;
     }
-  }, [positions, candidates]);
+    localStorage.setItem("hirel_data", JSON.stringify({ positions, candidates }));
+    const now = Date.now();
+    if (now - lastPushRef.current < 1000) return; // 1초 디바운스
+    lastPushRef.current = now;
+    pushToRoom(roomId, { positions, candidates });
+  }, [positions, candidates, syncEnabled, isRoomHost, roomId]);
 
-  // 팀원: 3초마다 pull
+  // 팀원: 2초마다 pull
   useEffect(() => {
     if (syncEnabled && !isRoomHost && roomId) {
-      pullFromRoom(roomId); // 즉시 1회
-      pollRef.current = setInterval(() => pullFromRoom(roomId), 3000);
+      pullFromRoom(roomId);
+      pollRef.current = setInterval(() => pullFromRoom(roomId), 2000);
       return () => clearInterval(pollRef.current);
     }
   }, [syncEnabled, isRoomHost, roomId]);
 
   const stopSync = () => {
-    setSyncEnabled(false);
-    setRoomId(null);
-    setIsRoomHost(false);
-    clearInterval(pollRef.current);
+    setSyncEnabled(false); setRoomId(null); setIsRoomHost(false);
+    setSyncStatus("idle"); clearInterval(pollRef.current);
     window.history.replaceState({}, "", window.location.pathname);
     showToast("공유 종료됨");
   };
@@ -975,10 +985,19 @@ export default function HireL() {
                 🔴 실시간 공유 시작
               </button>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(16,185,129,.1)", border: "1px solid rgba(16,185,129,.3)", borderRadius: 9, padding: "6px 14px" }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: C.green, animation: "pulse 1.5s ease infinite" }} />
-                <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>{isRoomHost ? `룸: ${roomId}` : "동기화 중"}</span>
-                {isRoomHost && <button onClick={async () => { const u = `${window.location.origin}?room=${roomId}`; await navigator.clipboard.writeText(u).catch(()=>{}); showToast("링크 복사됨!"); }} style={{ background: "none", border: "none", color: C.green, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>📋 링크 복사</button>}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: syncStatus === "connected" ? "rgba(16,185,129,.1)" : "rgba(245,158,11,.1)", border: `1px solid ${syncStatus === "connected" ? "rgba(16,185,129,.3)" : "rgba(245,158,11,.3)"}`, borderRadius: 9, padding: "6px 14px" }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: syncStatus === "connected" ? C.green : C.amber, animation: "pulse 1.5s ease infinite" }} />
+                <span style={{ fontSize: 12, color: syncStatus === "connected" ? C.green : C.amber, fontWeight: 600 }}>
+                  {isRoomHost ? `룸: ${roomId}` : syncStatus === "connected" ? "동기화 완료" : "동기화 중..."}
+                </span>
+                {isRoomHost && (
+                  <button onClick={async () => {
+                    await pushToRoom(roomId, { positions, candidates });
+                    const u = `${window.location.origin}?room=${roomId}`;
+                    await navigator.clipboard.writeText(u).catch(()=>{});
+                    showToast("링크 복사됨!");
+                  }} style={{ background: "none", border: "none", color: C.green, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>📋 링크 복사</button>
+                )}
                 <button onClick={stopSync} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 14 }}>✕</button>
               </div>
             )}
