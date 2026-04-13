@@ -253,12 +253,20 @@ function exportCandidatePDF(candidate, position) {
 
   <!-- Interview Questions -->
   <div class="section">
-    <h2>AI 추천 면접 질문</h2>
-    ${a.interviewQuestions?.map((q, i) => `
-      <div style="display:flex;gap:12px;padding:12px 16px;border-radius:8px;background:#f9fafb;border:1px solid #e5e7eb;margin-bottom:9px">
-        <span style="min-width:24px;height:24px;border-radius:6px;background:#eff6ff;color:#3B82F6;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">Q${i+1}</span>
-        <span style="font-size:13px;color:#374151;line-height:1.6;padding-top:3px">${q}</span>
-      </div>`).join("") || ""}
+    <h2>AI 추천 면접 질문 (10개)</h2>
+    ${(() => {
+      const iq = a.interviewQuestions;
+      if (!iq) return "";
+      if (Array.isArray(iq)) {
+        return iq.map((q, i) => `<div style="display:flex;gap:12px;padding:12px 16px;border-radius:8px;background:#f9fafb;border:1px solid #e5e7eb;margin-bottom:9px"><span style="min-width:24px;height:24px;border-radius:6px;background:#eff6ff;color:#3B82F6;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">Q${i+1}</span><span style="font-size:13px;color:#374151;line-height:1.6;padding-top:3px">${q}</span></div>`).join("");
+      }
+      const sections = [["🧡 인성/컬쳐핏", iq.culture||[], "#F59E0B"], ["💼 직무 역량", iq.skill||[], "#3B82F6"], ["🚀 미래/방향성", iq.future||[], "#8B5CF6"]];
+      return sections.map(([label, qs, color]) => `
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:8px;padding:2px 8px;background:${color}18;border-radius:5px;display:inline-block">${label}</div>
+          ${qs.map(q => `<div style="display:flex;gap:12px;padding:10px 14px;border-radius:8px;background:#f9fafb;border:1px solid #e5e7eb;margin-bottom:7px"><span style="min-width:20px;height:20px;border-radius:5px;background:${color}18;color:${color};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">Q</span><span style="font-size:13px;color:#374151;line-height:1.6">${q}</span></div>`).join("")}
+        </div>`).join("");
+    })()}
   </div>
 
   <!-- Team Checklist -->
@@ -725,23 +733,100 @@ export default function HireL() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [toast, setToast] = useState(null);
 
-  const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
+  // 실시간 공유 상태
+  const [roomId, setRoomId] = useState(null);
+  const [isRoomHost, setIsRoomHost] = useState(false);
+  const [syncEnabled, setSyncEnabled] = useState(false);
+  const pollRef = useRef(null);
+  const isSyncingRef = useRef(false);
 
-  // Load from localStorage
+  const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
+
+  // URL에서 roomId 읽기 (팀원이 링크 접속 시)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("hirel_data");
-      if (saved) { const d = JSON.parse(saved); setPositions(d.positions || []); setCandidates(d.candidates || []); }
-      else { setPositions(SAMPLE_POSITIONS); setCandidates(SAMPLE_CANDIDATES); }
-    } catch (e) { setPositions(SAMPLE_POSITIONS); setCandidates(SAMPLE_CANDIDATES); }
+    const params = new URLSearchParams(window.location.search);
+    const rid = params.get("room");
+    if (rid) {
+      setRoomId(rid);
+      setIsRoomHost(false);
+      setSyncEnabled(true);
+      showToast(`🔗 공유 룸 연결됨 — 실시간 동기화 중`);
+    } else {
+      // 로컬 데이터 불러오기
+      try {
+        const saved = localStorage.getItem("hirel_data");
+        if (saved) { const d = JSON.parse(saved); setPositions(d.positions || []); setCandidates(d.candidates || []); }
+        else { setPositions(SAMPLE_POSITIONS); setCandidates(SAMPLE_CANDIDATES); }
+      } catch (e) { setPositions(SAMPLE_POSITIONS); setCandidates(SAMPLE_CANDIDATES); }
+    }
   }, []);
 
-  // Save to localStorage on change
+  // 룸 생성 (호스트)
+  const createRoom = async () => {
+    const rid = Math.random().toString(36).slice(2, 8).toUpperCase();
+    setRoomId(rid);
+    setIsRoomHost(true);
+    setSyncEnabled(true);
+    // 현재 데이터 업로드
+    await pushToRoom(rid, { positions, candidates });
+    const shareUrl = `${window.location.origin}?room=${rid}`;
+    await navigator.clipboard.writeText(shareUrl).catch(() => {});
+    showToast(`📋 링크 복사됨! 룸코드: ${rid}`);
+  };
+
+  const pushToRoom = async (rid, data) => {
+    if (isSyncingRef.current) return;
+    try {
+      await fetch(`/api/sync?roomId=${rid}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ positions: data.positions, candidates: data.candidates, updatedAt: Date.now() }),
+      });
+    } catch (e) { console.error("sync push error:", e); }
+  };
+
+  const pullFromRoom = async (rid) => {
+    try {
+      const res = await fetch(`/api/sync?roomId=${rid}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data || !data.positions) return;
+      isSyncingRef.current = true;
+      setPositions(data.positions || []);
+      setCandidates(data.candidates || []);
+      setTimeout(() => { isSyncingRef.current = false; }, 500);
+    } catch (e) { console.error("sync pull error:", e); }
+  };
+
+  // 호스트: 데이터 변경 시 룸에 push
   useEffect(() => {
-    if (positions.length > 0 || candidates.length > 0) {
+    if (syncEnabled && isRoomHost && roomId && !isSyncingRef.current) {
+      if (positions.length > 0 || candidates.length > 0) {
+        pushToRoom(roomId, { positions, candidates });
+        localStorage.setItem("hirel_data", JSON.stringify({ positions, candidates }));
+      }
+    } else if (!syncEnabled && (positions.length > 0 || candidates.length > 0)) {
       localStorage.setItem("hirel_data", JSON.stringify({ positions, candidates }));
     }
   }, [positions, candidates]);
+
+  // 팀원: 3초마다 pull
+  useEffect(() => {
+    if (syncEnabled && !isRoomHost && roomId) {
+      pullFromRoom(roomId); // 즉시 1회
+      pollRef.current = setInterval(() => pullFromRoom(roomId), 3000);
+      return () => clearInterval(pollRef.current);
+    }
+  }, [syncEnabled, isRoomHost, roomId]);
+
+  const stopSync = () => {
+    setSyncEnabled(false);
+    setRoomId(null);
+    setIsRoomHost(false);
+    clearInterval(pollRef.current);
+    window.history.replaceState({}, "", window.location.pathname);
+    showToast("공유 종료됨");
+  };
 
   const IS = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "10px 13px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
   const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 9, color: "#fff", padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" });
@@ -883,6 +968,22 @@ export default function HireL() {
             </button>
             <button onClick={() => importRef.current?.click()} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
               📥 불러오기
+            </button>
+            {/* 실시간 공유 버튼 */}
+            {!syncEnabled ? (
+              <button onClick={createRoom} style={{ ...BP(`linear-gradient(135deg,${C.green},${C.teal})`), padding: "7px 16px", fontSize: 12, display: "flex", alignItems: "center", gap: 6, boxShadow: `0 0 14px ${C.green}50` }}>
+                🔴 실시간 공유 시작
+              </button>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(16,185,129,.1)", border: "1px solid rgba(16,185,129,.3)", borderRadius: 9, padding: "6px 14px" }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: C.green, animation: "pulse 1.5s ease infinite" }} />
+                <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>{isRoomHost ? `룸: ${roomId}` : "동기화 중"}</span>
+                {isRoomHost && <button onClick={async () => { const u = `${window.location.origin}?room=${roomId}`; await navigator.clipboard.writeText(u).catch(()=>{}); showToast("링크 복사됨!"); }} style={{ background: "none", border: "none", color: C.green, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>📋 링크 복사</button>}
+                <button onClick={stopSync} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 14 }}>✕</button>
+              </div>
+            )}
+            <button onClick={() => { if(confirm("저장된 데이터를 전부 초기화할까요?")) { localStorage.removeItem("hirel_data"); window.location.reload(); } }} style={{ ...BP("transparent"), border: `1px solid ${C.red}40`, color: C.red, boxShadow: "none", padding: "7px 14px", fontSize: 12 }}>
+              🗑 초기화
             </button>
             <button onClick={() => setShowAddCandidate(true)} style={{ ...BP(), padding: "8px 16px", fontSize: 13 }}>+ 후보자</button>
             <button onClick={() => { setEditingPosition(null); setShowPositionModal(true); }} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.accent, boxShadow: "none", padding: "8px 16px", fontSize: 13 }}>+ 포지션</button>
