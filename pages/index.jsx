@@ -433,7 +433,7 @@ function InterviewRoom({ candidate, position, onBack }) {
 
   const doScore = async (tx) => {
     if (!tx || tx.trim().split(" ").length < 15 || scoringRef.current) return;
-    if (tx.length - lastScoredRef.current < 80) return; // 80자 이상 새로 쌓였을 때만
+    if (tx.length - lastScoredRef.current < 80) return;
     scoringRef.current = true;
     setScoring(true);
     try {
@@ -460,7 +460,6 @@ function InterviewRoom({ candidate, position, onBack }) {
       }
       if (fin) {
         setTranscript(p => { const n = p + fin; txRef.current = n; return n; });
-        // 침묵 감지 타이머 — 말이 끊기면 4초 후 자동 평가
         clearTimeout(silenceId);
         silenceId = setTimeout(() => { doScore(txRef.current); }, 4000);
       }
@@ -474,7 +473,6 @@ function InterviewRoom({ candidate, position, onBack }) {
     recogRef.current?.stop(); recogRef.current = null;
     clearInterval(timerRef.current);
     setRecording(false); setInterim("");
-    // 녹음 종료 시 최종 평가
     if (txRef.current.trim().length > 30) doScore(txRef.current);
   };
   const addNote = () => { if (!noteInput.trim()) return; setNotes(p => [...p, { text: noteInput, t: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) }]); setNoteInput(""); };
@@ -483,7 +481,6 @@ function InterviewRoom({ candidate, position, onBack }) {
   const IS = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "9px 13px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
   const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 8, color: "#fff", padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" });
 
-  // 면접 질문 파싱 (구조화된 형태 or 구버전 배열 모두 지원)
   const iq = candidate.analysis?.interviewQuestions;
   const questions = iq && typeof iq === "object" && !Array.isArray(iq) ? iq : null;
   const legacyQ = Array.isArray(iq) ? iq : null;
@@ -519,7 +516,6 @@ function InterviewRoom({ candidate, position, onBack }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 370px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* 구조화된 10개 질문 */}
           {(questions || legacyQ) && (
             <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 12 }}>💬 면접 질문 20개</div>
@@ -744,17 +740,15 @@ export default function HireL() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [toast, setToast] = useState(null);
 
-  // 실시간 공유 상태
   const [roomId, setRoomId] = useState(null);
   const [isRoomHost, setIsRoomHost] = useState(false);
   const [syncEnabled, setSyncEnabled] = useState(false);
-  const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | connected | error
+  const [syncStatus, setSyncStatus] = useState("idle");
   const pollRef = useRef(null);
   const lastPushRef = useRef(0);
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
-  // URL에서 roomId 읽기 (팀원)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const rid = params.get("room");
@@ -773,10 +767,8 @@ export default function HireL() {
     }
   }, []);
 
-  // 데이터 Firebase에 올리기
   const pushToRoom = async (rid, data) => {
     try {
-      // 용량 최소화: files(PDF base64) 제거, resume 500자 제한
       const slim = {
         positions: data.positions.map(p => ({ id: p.id, name: p.name, colorIdx: p.colorIdx, jd: (p.jd||"").slice(0, 300) })),
         candidates: data.candidates.map(c => ({
@@ -807,7 +799,6 @@ export default function HireL() {
     } catch (e) { console.error("push error:", e); setSyncStatus("error"); }
   };
 
-  // Firebase에서 가져오기
   const pullFromRoom = async (rid) => {
     try {
       const res = await fetch(`/api/sync?roomId=${rid}`);
@@ -821,36 +812,45 @@ export default function HireL() {
     } catch (e) { console.error("pull error:", e); }
   };
 
-  // 룸 생성 (호스트)
   const createRoom = async () => {
     const rid = Math.random().toString(36).slice(2, 8).toUpperCase();
     setRoomId(rid);
     setIsRoomHost(true);
     setSyncEnabled(true);
     setSyncStatus("syncing");
-    // 현재 데이터 즉시 업로드
     await pushToRoom(rid, { positions, candidates });
     const shareUrl = `${window.location.origin}?room=${rid}`;
     try { await navigator.clipboard.writeText(shareUrl); } catch(e) {}
     showToast(`✓ 공유 시작! 룸코드: ${rid} — 링크 복사됨`);
   };
 
-  // 호스트: 데이터 변경 시 자동 push (1초 디바운스)
+  // ─── ✅ FIX: localStorage 저장 시 files(base64) 제거 + try-catch ───────────
   useEffect(() => {
+    // base64 파일 데이터는 localStorage에 저장하지 않음 (5MB 한도 초과 방지)
+    const slimCandidates = candidates.map(c => ({ ...c, files: [] }));
+
     if (!syncEnabled || !isRoomHost || !roomId) {
       if (!syncEnabled && (positions.length > 0 || candidates.length > 0)) {
-        localStorage.setItem("hirel_data", JSON.stringify({ positions, candidates }));
+        try {
+          localStorage.setItem("hirel_data", JSON.stringify({ positions, candidates: slimCandidates }));
+        } catch (e) {
+          console.error("localStorage 저장 실패 (용량 초과):", e);
+        }
       }
       return;
     }
-    localStorage.setItem("hirel_data", JSON.stringify({ positions, candidates }));
+    try {
+      localStorage.setItem("hirel_data", JSON.stringify({ positions, candidates: slimCandidates }));
+    } catch (e) {
+      console.error("localStorage 저장 실패 (용량 초과):", e);
+    }
     const now = Date.now();
-    if (now - lastPushRef.current < 1000) return; // 1초 디바운스
+    if (now - lastPushRef.current < 1000) return;
     lastPushRef.current = now;
     pushToRoom(roomId, { positions, candidates });
   }, [positions, candidates, syncEnabled, isRoomHost, roomId]);
+  // ─────────────────────────────────────────────────────────────────────────────
 
-  // 팀원: 2초마다 pull
   useEffect(() => {
     if (syncEnabled && !isRoomHost && roomId) {
       pullFromRoom(roomId);
@@ -915,7 +915,6 @@ export default function HireL() {
     if (selectedPositionId === pid) setSelectedPositionId("all");
   };
 
-  // Team share — JSON export/import
   const exportJSON = () => {
     const data = JSON.stringify({ positions, candidates }, null, 2);
     const blob = new Blob([data], { type: "application/json" });
@@ -936,7 +935,6 @@ export default function HireL() {
     e.target.value = "";
   };
 
-  // Export all candidates in a position as PDF
   const exportAllPDF = (posId) => {
     const pos = positions.find(p => p.id === posId);
     const pCandidates = candidates.filter(c => c.positionId === posId && c.analysis);
@@ -981,7 +979,6 @@ export default function HireL() {
         <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
       </Head>
 
-      {/* Toast */}
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: toast.type === "error" ? C.red : C.green, color: "#fff", padding: "10px 20px", borderRadius: 24, fontSize: 13, fontWeight: 600, zIndex: 9999, boxShadow: "0 4px 20px rgba(0,0,0,.4)", transition: "all .3s" }}>
           {toast.type === "error" ? "❌ " : "✓ "}{toast.msg}
@@ -990,7 +987,6 @@ export default function HireL() {
 
       <input ref={importRef} type="file" accept=".json" hidden onChange={importJSON} />
 
-      {/* Header */}
       <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: "0 28px", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", alignItems: "center", height: 56, gap: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -1004,14 +1000,12 @@ export default function HireL() {
             ))}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-            {/* Team share buttons */}
             <button onClick={exportJSON} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
               📤 팀 공유
             </button>
             <button onClick={() => importRef.current?.click()} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
               📥 불러오기
             </button>
-            {/* 실시간 공유 버튼 */}
             {!syncEnabled ? (
               <button onClick={createRoom} style={{ ...BP(`linear-gradient(135deg,${C.green},${C.teal})`), padding: "7px 16px", fontSize: 12, display: "flex", alignItems: "center", gap: 6, boxShadow: `0 0 14px ${C.green}50` }}>
                 🔴 실시간 공유 시작
@@ -1042,7 +1036,6 @@ export default function HireL() {
         </div>
       </div>
 
-      {/* Position Tab Bar */}
       <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: "0 28px" }}>
         <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", gap: 2, overflowX: "auto" }}>
           <button onClick={() => setSelectedPositionId("all")} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 16px", background: "none", border: "none", borderBottom: `2px solid ${selectedPositionId === "all" ? C.accent : "transparent"}`, color: selectedPositionId === "all" ? C.accent : C.sub, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", transition: "all .2s" }}>
@@ -1070,8 +1063,6 @@ export default function HireL() {
       </div>
 
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 28px" }}>
-
-        {/* Dashboard */}
         {view === "dashboard" && (
           <div>
             {candidates.length === 0 ? (
@@ -1116,7 +1107,6 @@ export default function HireL() {
           </div>
         )}
 
-        {/* Detail */}
         {view === "detail" && (
           <div>
             {!sel ? (
@@ -1252,7 +1242,6 @@ export default function HireL() {
         )}
       </div>
 
-      {/* Add Candidate Modal */}
       {showAddCandidate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }}>
           <div style={{ background: C.card, borderRadius: 18, border: `1px solid ${C.border}`, padding: 28, width: 520, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" }}>
@@ -1261,7 +1250,6 @@ export default function HireL() {
               <button onClick={() => setShowAddCandidate(false)} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer", fontSize: 20 }}>✕</button>
             </div>
 
-            {/* 포지션 선택 + 인라인 추가 */}
             <label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 8 }}>포지션 선택 *</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
               {positions.map(pos => {
@@ -1271,14 +1259,12 @@ export default function HireL() {
                   <div style={{ width: 7, height: 7, borderRadius: "50%", background: rc.accent }} />{pos.name}
                 </button>);
               })}
-              {/* 새 포지션 인라인 추가 버튼 */}
               <button onClick={() => setAddForm(p => ({ ...p, showNewPos: !p.showNewPos, positionId: "" }))}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: `1px dashed ${addForm.showNewPos ? C.accent : C.borderL}`, background: addForm.showNewPos ? C.glow : "transparent", color: addForm.showNewPos ? C.accent : C.muted, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 500 }}>
                 + 새 포지션
               </button>
             </div>
 
-            {/* 새 포지션 인라인 폼 */}
             {addForm.showNewPos && (
               <div style={{ background: C.surface, borderRadius: 12, border: `1px solid ${C.accent}40`, padding: 16, marginBottom: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.accent, marginBottom: 12 }}>✦ 새 포지션 만들기</div>
