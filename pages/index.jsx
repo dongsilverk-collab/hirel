@@ -317,6 +317,7 @@ function exportCandidatePDF(candidate, position) {
 
 // ─── Atoms ────────────────────────────────────────────────────────────────────
 function Ring({ score, size = 80, stroke = 7, color = C.accent, label }) {
+  score = score ?? 0;
   const r = (size - stroke * 2) / 2, ci = 2 * Math.PI * r, d = (score / 100) * ci;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
@@ -336,6 +337,7 @@ function Ring({ score, size = 80, stroke = 7, color = C.accent, label }) {
   );
 }
 function Bar({ label, score }) {
+  score = score ?? 0;
   const c = sc(score);
   return (
     <div style={{ marginBottom: 12 }}>
