@@ -897,13 +897,21 @@ export default function HireL() {
   const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 9, color: "#fff", padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" });
   const vStyle = (v) => ({ "추천": { color: C.green, bg: "rgba(16,185,129,.1)", border: "rgba(16,185,129,.3)" }, "검토필요": { color: C.amber, bg: "rgba(245,158,11,.1)", border: "rgba(245,158,11,.3)" }, "부적합": { color: C.red, bg: "rgba(239,68,68,.1)", border: "rgba(239,68,68,.3)" } }[v] || { color: C.sub, bg: C.card, border: C.border });
 
-  const doAnalyze = async (c) => {
+  const doAnalyzeAndSync = async (c) => {
     const pos = positions.find(p => p.id === c.positionId);
     if (!pos) { showToast("포지션을 찾을 수 없습니다", "error"); return; }
     setAnalyzingIds(p => new Set(p).add(c.id));
     try {
       const r = await analyzeResume(pos.jd, c);
-      setCandidates(p => p.map(x => x.id === c.id ? { ...x, analysis: r } : x));
+      setCandidates(prev => {
+        const updated = prev.map(x => x.id === c.id ? { ...x, analysis: r } : x);
+        // ✅ 분석 완료 직후 최신 state로 즉시 Firebase push (throttle 우회)
+        if (syncEnabled && isRoomHost && roomId) {
+          lastPushRef.current = 0;
+          pushToRoom(roomId, { positions, candidates: updated });
+        }
+        return updated;
+      });
       showToast(`${c.name} 분석 완료 — ${r.totalScore}점 ${r.verdict}`);
     } catch (e) {
       console.error("분석 오류:", e);
@@ -915,6 +923,8 @@ export default function HireL() {
     }
     setAnalyzingIds(p => { const s = new Set(p); s.delete(c.id); return s; });
   };
+  // 하위 호환 alias
+  const doAnalyze = doAnalyzeAndSync;
 
   const addCandidate = () => {
     if (!addForm.name || !addForm.positionId) return;
@@ -925,8 +935,8 @@ export default function HireL() {
     setCandidates(p => [...p, c]);
     setAddForm({ name: "", age: "", resume: "", positionId: "", inputMode: "file" });
     setUploadedFiles([]); setShowAddCandidate(false);
-    doAnalyze(c);
     showToast(`${c.name} 후보자 등록 완료 — AI 분석 시작`);
+    doAnalyzeAndSync(c);
   };
 
   const addPosition = (data) => {
