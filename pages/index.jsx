@@ -784,7 +784,11 @@ export default function HireL() {
             showToast(`✓ 데이터 동기화 완료 — 룸코드: ${rid}`);
           }
         })
-        .catch(e => console.error("초기 pull 실패:", e));
+        .catch(e => {
+          console.error("초기 pull 실패:", e);
+          setSyncStatus("error");
+          showToast("동기화 실패 — Firebase 권한을 확인하세요", "error");
+        });
     } else {
       try {
         const saved = localStorage.getItem("hirel_data");
