@@ -773,6 +773,18 @@ export default function HireL() {
       setSyncEnabled(true);
       setSyncStatus("syncing");
       showToast(`🔗 공유 룸 연결 중... 룸코드: ${rid}`);
+      // ✅ FIX: 링크 열자마자 즉시 데이터 pull (빈 화면 방지)
+      fetch(`/api/sync?roomId=${rid}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && data.positions && data.candidates) {
+            setPositions(data.positions);
+            setCandidates(data.candidates);
+            setSyncStatus("connected");
+            showToast(`✓ 데이터 동기화 완료 — 룸코드: ${rid}`);
+          }
+        })
+        .catch(e => console.error("초기 pull 실패:", e));
     } else {
       try {
         const saved = localStorage.getItem("hirel_data");
@@ -785,7 +797,7 @@ export default function HireL() {
   const pushToRoom = async (rid, data) => {
     try {
       const slim = {
-        positions: data.positions.map(p => ({ id: p.id, name: p.name, colorIdx: p.colorIdx, jd: (p.jd||"").slice(0, 300) })),
+        positions: data.positions.map(p => ({ id: p.id, name: p.name, colorIdx: p.colorIdx, jd: (p.jd||"") })),
         candidates: data.candidates.map(c => ({
           id: c.id, positionId: c.positionId, name: c.name, age: c.age,
           fileNames: c.fileNames || [],
