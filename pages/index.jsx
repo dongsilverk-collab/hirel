@@ -30,6 +30,33 @@ const ROLE_COLORS = [
 function fileToBase64(f){return new Promise((r,j)=>{const x=new FileReader();x.onload=()=>r(x.result.split(",")[1]);x.onerror=j;x.readAsDataURL(f)});}
 function fileToText(f){return new Promise((r,j)=>{const x=new FileReader();x.onload=()=>r(x.result);x.onerror=j;x.readAsText(f,"UTF-8")});}
 async function docxText(f){if(!mammoth)return"";const ab=await f.arrayBuffer();return(await mammoth.extractRawText({arrayBuffer:ab})).value;}
+// ─── PDF text extraction (pdf.js, browser-only, CDN) — base64 대신 텍스트만 전송해 413 방지 ───
+function loadPdfJs(){
+  if(typeof window==="undefined")return Promise.resolve(null);
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(window.__pdfjsLoading)return window.__pdfjsLoading;
+  window.__pdfjsLoading=new Promise((resolve,reject)=>{
+    const s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";resolve(window.pdfjsLib);};
+    s.onerror=()=>reject(new Error("pdf.js 로드 실패"));
+    document.head.appendChild(s);
+  });
+  return window.__pdfjsLoading;
+}
+async function pdfText(f){
+  const lib=await loadPdfJs();
+  if(!lib)return"";
+  const ab=await f.arrayBuffer();
+  const pdf=await lib.getDocument({data:ab}).promise;
+  let out="";
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const tc=await page.getTextContent();
+    out+=tc.items.map(it=>it.str).join(" ")+"\n";
+  }
+  return out.trim();
+}
 function fileIcon(t=""){return t.includes("pdf")?"📄":t.includes("word")||t.includes("docx")?"📝":t.startsWith("image")?"🖼":"📃";}
 function fmtSize(b){return b<1024?b+" B":b<1048576?(b/1024).toFixed(1)+" KB":(b/1048576).toFixed(1)+" MB";}
 function fmtTime(s){return`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;}
@@ -383,7 +410,20 @@ function UploadZone({ onReady }) {
     for (const f of Array.from(raw)) {
       try {
         const t = f.type;
-        if (t === "application/pdf") results.push({ kind: "pdf", b64: await fileToBase64(f), name: f.name, size: f.size, type: t });
+        if (t === "application/pdf") {
+          let ptext = "";
+          try { ptext = await pdfText(f); } catch (e) { console.error("PDF 텍스트 추출 실패:", e); }
+          if (ptext.replace(/\s/g, "").length >= 40) {
+            // 텍스트 PDF → 텍스트만 사용 (base64 미전송 → 413 방지). kind:"text"라 addCandidate에서 자동으로 이력서에 합쳐짐
+            results.push({ kind: "text", text: ptext, name: f.name, size: f.size, type: t });
+          } else if (f.size < 3 * 1024 * 1024) {
+            // 스캔본 등 텍스트 추출 실패 + 3MB 미만 → base64 폴백 (4.5MB 한도 내)
+            results.push({ kind: "pdf", b64: await fileToBase64(f), name: f.name, size: f.size, type: t });
+          } else {
+            // 텍스트 없음 + 용량 큼 → 413 방지 위해 전송 불가, 안내만
+            results.push({ kind: "text", text: `(⚠ ${f.name}: 텍스트가 없는 스캔/이미지 PDF이고 용량이 커서 첨부할 수 없습니다. 텍스트가 들어있는 PDF로 다시 올려주세요.)`, name: f.name, size: f.size, type: t });
+          }
+        }
         else if (t.startsWith("image/")) results.push({ kind: "image", b64: await fileToBase64(f), name: f.name, size: f.size, type: t });
         else if (t.includes("word") || f.name.endsWith(".docx")) results.push({ kind: "text", text: await docxText(f), name: f.name, size: f.size, type: t });
         else results.push({ kind: "text", text: await fileToText(f), name: f.name, size: f.size, type: t });
