@@ -200,8 +200,12 @@ ${transcript || "(녹취 없음)"}
 
 위 면접 전체를 종합 평가하세요. 큐라엘 컬쳐핏(일당백, 환자 중심, 자율과 책임, 빠른 실행)을 중점 반영하세요.
 aiVerdict는 반드시 "합격" / "보류" / "불합격" 중 하나로만 출력하세요.
+
+또한 면접에서 실제로 드러난 역량을 바탕으로 아래 6개 항목 점수를 0~100으로 "재평가"하세요. 이력서만 보고 과소/과대평가됐던 부분을 면접 내용으로 보정하는 것이 목적입니다. 면접에서 판단 근거가 없는 항목은 기존 추정과 비슷하게 두세요.
+- experienceMatch(직무 경험), cultureFit(문화 적합도), skillKeywords(역량 키워드), stability(안정성), portfolioMatch(포트폴리오), growthPotential(성장 가능성)
+
 순수 JSON으로만 출력:
-{"aiScore":숫자(0-100),"aiVerdict":"합격|보류|불합격","summary":"3~4문장 종합 평가","strengths":["강점1","강점2","강점3"],"concerns":["우려1","우려2"],"oneliner":"한줄 총평"}`;
+{"aiScore":숫자(0-100),"aiVerdict":"합격|보류|불합격","summary":"3~4문장 종합 평가","strengths":["강점1","강점2","강점3"],"concerns":["우려1","우려2"],"oneliner":"한줄 총평","revisedScores":{"experienceMatch":80,"cultureFit":75,"skillKeywords":85,"stability":70,"portfolioMatch":60,"growthPotential":72}}`;
   const data = await callAI({ messages: [{ role: "user", content: prompt }] });
   const raw = data.content.map(b => b.text || "").join("");
   const m = raw.match(/\{[\s\S]*\}/);
@@ -432,7 +436,7 @@ function exportRecruitmentReport(candidates, positions) {
       ${a ? `<div style="font-size:12px;color:#6b7280;margin-bottom:8px">이력서 ${a.totalScore}점 · AI 사전판정 ${esc(a.verdict)}${fb ? " · 면접 " + fb.aiScore + "점" : ""}</div>` : ""}
       ${fb?.summary ? `<div style="font-size:13px;color:#374151;line-height:1.7;margin-bottom:10px"><b style="color:#111827">AI 종합평:</b> ${esc(fb.summary)}</div>` : ""}
       ${fb?.strengths?.length ? `<div style="font-size:12px;color:#374151;margin-bottom:8px"><b>강점:</b> ${fb.strengths.map(esc).join(" · ")}</div>` : ""}
-      ${votes.length ? `<div style="margin-top:8px"><div style="font-size:12px;font-weight:700;color:#111827;margin-bottom:5px">면접관 코멘트</div>${votes.map(v => `<div style="font-size:12px;color:#4b5563;padding:6px 10px;background:#f9fafb;border:1px solid #f0f0f0;border-radius:6px;margin-bottom:4px"><b style="color:#111827">${esc(v.name || "면접관")}</b> <span style="color:${dc(v.decision)}">[${esc(v.decision)}]</span> ${esc(v.comment)}</div>`).join("")}</div>` : ""}
+      ${votes.length ? `<div style="margin-top:8px"><div style="font-size:12px;font-weight:700;color:#111827;margin-bottom:5px">면접관 코멘트</div>${votes.map(v => `<div style="font-size:12px;color:#4b5563;padding:6px 10px;background:${v.isAI ? "#f5f3ff" : "#f9fafb"};border:1px solid ${v.isAI ? "#ddd6fe" : "#f0f0f0"};border-radius:6px;margin-bottom:4px"><b style="color:${v.isAI ? "#6d28d9" : "#111827"}">${v.isAI ? "🤖 AI 면접관" : esc(v.name || "면접관")}</b> <span style="color:${dc(v.decision)}">[${esc(v.decision)}]</span> ${esc(v.comment)}</div>`).join("")}</div>` : ""}
     </div>`;
   }).join("") || `<div style="color:#9ca3af;font-size:13px;padding:14px">아직 합격 확정된 후보가 없습니다.</div>`;
 
@@ -490,17 +494,33 @@ function Ring({ score, size = 80, stroke = 7, color = C.accent, label }) {
     </div>
   );
 }
-function Bar({ label, score }) {
+function Bar({ label, score, revised }) {
   score = score ?? 0;
-  const c = sc(score);
+  const has = revised != null && revised !== score;
+  const base = score, rev = has ? revised : score;
+  const baseC = sc(base), revC = sc(rev);
+  const up = has && rev > base, down = has && rev < base;
+  const boost = "#8B5CF6";
+  const delta = rev - base;
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5, alignItems: "center" }}>
         <span style={{ fontSize: 13, color: C.sub }}>{label}</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: c, fontFamily: "'DM Mono',monospace" }}>{score}점</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {has && <span style={{ fontSize: 10, fontWeight: 700, color: up ? boost : C.red, background: up ? "rgba(139,92,246,.15)" : "rgba(239,68,68,.12)", padding: "1px 6px", borderRadius: 8 }}>{delta > 0 ? `+${delta}` : delta} 면접</span>}
+          <span style={{ fontSize: 13, fontWeight: 700, color: has ? revC : baseC, fontFamily: "'DM Mono',monospace" }}>{rev}점</span>
+        </span>
       </div>
-      <div style={{ height: 5, background: C.border, borderRadius: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${score}%`, background: c, borderRadius: 3, transition: "width 1.2s ease", boxShadow: `0 0 7px ${c}80` }} />
+      <div style={{ height: 5, background: C.border, borderRadius: 3, overflow: "hidden", display: "flex" }}>
+        {up ? (<>
+          <div style={{ height: "100%", width: `${base}%`, background: baseC, transition: "width 1.2s ease" }} />
+          <div style={{ height: "100%", width: `${rev - base}%`, background: boost, boxShadow: `0 0 7px ${boost}80`, transition: "width 1.2s ease" }} />
+        </>) : down ? (<>
+          <div style={{ height: "100%", width: `${rev}%`, background: revC, transition: "width 1.2s ease" }} />
+          <div style={{ height: "100%", width: `${base - rev}%`, background: "rgba(239,68,68,.25)", transition: "width 1.2s ease" }} />
+        </>) : (
+          <div style={{ height: "100%", width: `${score}%`, background: baseC, borderRadius: 3, transition: "width 1.2s ease", boxShadow: `0 0 7px ${baseC}80` }} />
+        )}
       </div>
     </div>
   );
@@ -890,8 +910,10 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
     }
   };
 
-  const { tally, total, result } = tallyDecisions(evals);
-  const rows = Object.entries(evals).map(([id, v]) => ({ id, ...v })).sort((x, y) => (x.ts || 0) - (y.ts || 0));
+  const aiVote = (fb && fb.aiVerdict) ? { name: "AI 면접관", decision: fb.aiVerdict, comment: fb.oneliner || fb.summary || "", ts: 0 } : null;
+  const boardEvals = aiVote ? { ...evals, __ai__: aiVote } : { ...evals };
+  const { tally, total, result } = tallyDecisions(boardEvals);
+  const rows = Object.entries(boardEvals).map(([id, v]) => ({ id, ...v, isAI: id === "__ai__" })).sort((x, y) => (x.isAI ? -1 : y.isAI ? 1 : (x.ts || 0) - (y.ts || 0)));
   const rs = DEC_STYLE[result] || DEC_STYLE.보류;
   const fd = candidate.finalDecision;
 
@@ -955,7 +977,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
 
           <div style={Card}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>👥 합의 보드 ({total}명)</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>👥 합의 보드 ({total}표 · AI 포함)</span>
               <span style={{ padding: "4px 12px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: rs.bg, border: `1px solid ${rs.b}`, color: rs.c }}>다수결: {result}</span>
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
@@ -966,9 +988,10 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
             </div>
             {rows.length === 0 ? <div style={{ textAlign: "center", padding: "14px 0", color: C.muted, fontSize: 12 }}>아직 제출된 평가가 없습니다</div>
               : rows.map(r => { const s = DEC_STYLE[r.decision] || {}; return (
-                <div key={r.id} style={{ padding: "9px 11px", background: C.surface, borderRadius: 7, border: `1px solid ${C.border}`, marginBottom: 6 }}>
+                <div key={r.id} style={{ padding: "9px 11px", background: r.isAI ? "rgba(139,92,246,.08)" : C.surface, borderRadius: 7, border: `1px solid ${r.isAI ? "rgba(139,92,246,.35)" : C.border}`, marginBottom: 6 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{r.name || "면접관"}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: r.isAI ? C.purple : C.text }}>{r.isAI ? "🤖 AI 면접관" : (r.name || "면접관")}</span>
+                    {r.isAI && <span style={{ fontSize: 9, fontWeight: 700, color: C.purple, background: "rgba(139,92,246,.15)", border: "1px solid rgba(139,92,246,.3)", padding: "1px 6px", borderRadius: 8 }}>AI</span>}
                     <span style={{ marginLeft: "auto", padding: "2px 9px", borderRadius: 12, fontSize: 11, fontWeight: 700, background: s.bg, border: `1px solid ${s.b}`, color: s.c }}>{r.decision}</span>
                   </div>
                   {r.comment && <div style={{ fontSize: 12, color: C.sub, marginTop: 5, lineHeight: 1.5 }}>{r.comment}</div>}
@@ -976,7 +999,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
               ); })}
           </div>
 
-          {isHost && total > 0 && <button onClick={() => onSaveFinal(candidate.id, { result, tally, total, votes: rows.map(r => ({ name: r.name, decision: r.decision, comment: r.comment || "" })), decidedAt: Date.now() })} style={{ ...BP(`linear-gradient(135deg,${rs.c},${rs.c}cc)`), width: "100%" }}>🏁 다수결 결과 확정 — 후보 카드에 저장</button>}
+          {isHost && total > 0 && <button onClick={() => onSaveFinal(candidate.id, { result, tally, total, votes: rows.map(r => ({ name: r.name, decision: r.decision, comment: r.comment || "", isAI: !!r.isAI })), decidedAt: Date.now() })} style={{ ...BP(`linear-gradient(135deg,${rs.c},${rs.c}cc)`), width: "100%" }}>🏁 다수결 결과 확정 — 후보 카드에 저장</button>}
         </div>
       </div>
     </div>
@@ -1024,7 +1047,7 @@ function ReportView({ candidates, positions, onExport }) {
             {fb?.strengths?.length > 0 && <div style={{ fontSize: 12, color: C.sub, marginBottom: 10 }}><b style={{ color: C.text }}>강점:</b> {fb.strengths.join(" · ")}</div>}
             {votes.length > 0 && <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 6 }}>면접관 코멘트</div>
-              {votes.map((v, i) => { const s = DEC_STYLE[v.decision] || {}; return <div key={i} style={{ fontSize: 12, color: C.sub, padding: "7px 11px", background: C.surface, borderRadius: 7, border: `1px solid ${C.border}`, marginBottom: 5 }}><b style={{ color: C.text }}>{v.name || "면접관"}</b> <span style={{ color: s.c }}>[{v.decision}]</span> {v.comment}</div>; })}
+              {votes.map((v, i) => { const s = DEC_STYLE[v.decision] || {}; return <div key={i} style={{ fontSize: 12, color: C.sub, padding: "7px 11px", background: v.isAI ? "rgba(139,92,246,.08)" : C.surface, borderRadius: 7, border: `1px solid ${v.isAI ? "rgba(139,92,246,.3)" : C.border}`, marginBottom: 5 }}><b style={{ color: v.isAI ? C.purple : C.text }}>{v.isAI ? "🤖 AI 면접관" : (v.name || "면접관")}</b> <span style={{ color: s.c }}>[{v.decision}]</span> {v.comment}</div>; })}
             </div>}
           </div>;
         })}
@@ -1050,6 +1073,37 @@ function ReportView({ candidates, positions, onExport }) {
   );
 }
 
+// ─── 면접 결과·결정 요약 (카드/상세 공용) ───────────────────────────────────────
+function DecisionSummary({ candidate, compact }) {
+  const fd = candidate.finalDecision;
+  const fb = candidate.interviewFeedback;
+  if (!fd && !fb) return compact ? null : (
+    <div style={{ fontSize: 12, color: C.muted, padding: "10px 12px", background: C.surface, borderRadius: 8, border: `1px dashed ${C.border}` }}>아직 면접·결정 전입니다. 면접 종료 후 평가하면 결과가 여기 표시돼요.</div>
+  );
+  const s = fd ? (DEC_STYLE[fd.result] || {}) : {};
+  const fbS = fb ? (DEC_STYLE[fb.aiVerdict] || {}) : {};
+  const t = (fd && fd.tally) || {};
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: compact ? 6 : 10, marginTop: compact ? 10 : 0 }}>
+      {fd && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: compact ? "7px 10px" : "10px 13px", background: s.bg, border: `1px solid ${s.b}`, borderRadius: 8 }}>
+        <span style={{ fontSize: compact ? 12 : 13, fontWeight: 700, color: s.c }}>최종 {fd.result}</span>
+        <span style={{ marginLeft: "auto", fontSize: compact ? 11 : 12, color: C.sub }}>
+          <span style={{ color: DEC_STYLE.합격.c }}>합격 {t.합격 || 0}</span> · <span style={{ color: DEC_STYLE.보류.c }}>보류 {t.보류 || 0}</span> · <span style={{ color: DEC_STYLE.불합격.c }}>불합격 {t.불합격 || 0}</span>
+        </span>
+      </div>}
+      {fb && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: compact ? "7px 10px" : "10px 13px", background: "rgba(139,92,246,.08)", border: "1px solid rgba(139,92,246,.3)", borderRadius: 8 }}>
+        <span style={{ fontSize: compact ? 11 : 12, color: C.purple, fontWeight: 600 }}>🤖 AI 면접관 표</span>
+        <span style={{ marginLeft: "auto", fontSize: compact ? 12 : 13, fontWeight: 700, color: fbS.c || C.sub }}>{fb.aiVerdict}{fb.aiScore != null ? ` · ${fb.aiScore}점` : ""}</span>
+      </div>}
+      {!compact && fb?.summary && <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, padding: "10px 13px", background: C.surface, borderRadius: 8, border: `1px solid ${C.border}` }}><b style={{ color: C.text }}>AI 종합평</b> · {fb.summary}</div>}
+      {!compact && fd?.votes?.filter(v => v.comment).length > 0 && <div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 6 }}>면접관 코멘트</div>
+        {fd.votes.filter(v => v.comment).map((v, i) => { const vs = DEC_STYLE[v.decision] || {}; return <div key={i} style={{ fontSize: 12, color: C.sub, padding: "7px 11px", background: v.isAI ? "rgba(139,92,246,.08)" : C.surface, borderRadius: 7, border: `1px solid ${v.isAI ? "rgba(139,92,246,.3)" : C.border}`, marginBottom: 5 }}><b style={{ color: v.isAI ? C.purple : C.text }}>{v.isAI ? "🤖 AI 면접관" : (v.name || "면접관")}</b> <span style={{ color: vs.c }}>[{v.decision}]</span> {v.comment}</div>; })}
+      </div>}
+    </div>
+  );
+}
+
 // ─── Candidate Card ───────────────────────────────────────────────────────────
 function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onReanalyze, onExportPDF, onDecision, position }) {
   const busy = analyzingIds.has(c.id);
@@ -1066,7 +1120,8 @@ function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onR
           <div style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</div>
           <div style={{ fontSize: 11, color: C.sub }}>{c.age ? `${c.age}세` : ""}{c.fileNames?.length > 0 && <span style={{ marginLeft: 5 }}>📎{c.fileNames.length}</span>}</div>
         </div>
-        {(c.finalDecision || (!busy && a)) && <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+        {(c.finalDecision || c.interviewFeedback || (!busy && a)) && <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+          {c.interviewFeedback && <span style={{ padding: "3px 9px", borderRadius: 16, fontSize: 10, fontWeight: 700, background: "rgba(139,92,246,.15)", border: "1px solid rgba(139,92,246,.35)", color: C.purple }}>면접 완료</span>}
           {c.finalDecision && <span style={{ padding: "3px 10px", borderRadius: 16, fontSize: 11, fontWeight: 700, background: (DEC_STYLE[c.finalDecision.result] || {}).bg, border: `1px solid ${(DEC_STYLE[c.finalDecision.result] || {}).b}`, color: (DEC_STYLE[c.finalDecision.result] || {}).c }}>{c.finalDecision.result}</span>}
           {!busy && a && <span style={{ padding: "3px 10px", borderRadius: 16, fontSize: 11, fontWeight: 700, background: vStyle(a.verdict).bg, border: `1px solid ${vStyle(a.verdict).border}`, color: vStyle(a.verdict).color }}>{a.verdict}</span>}
         </div>}
@@ -1075,15 +1130,16 @@ function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onR
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <Ring score={a.totalScore} size={60} stroke={5} color={rc.accent} />
           <div style={{ flex: 1 }}>
-            <Bar label="직무 경험" score={a.scores.experienceMatch} />
-            <Bar label="문화 적합도" score={a.scores.cultureFit} />
+            <Bar label="직무 경험" score={a.scores.experienceMatch} revised={c.interviewFeedback?.revisedScores?.experienceMatch} />
+            <Bar label="문화 적합도" score={a.scores.cultureFit} revised={c.interviewFeedback?.revisedScores?.cultureFit} />
           </div>
         </div>
-        <Bar label="역량 키워드" score={a.scores.skillKeywords} />
-        <Bar label="안정성" score={a.scores.stability} />
-        <Bar label="포트폴리오" score={a.scores.portfolioMatch} />
-        <Bar label="성장 가능성" score={a.scores.growthPotential} />
+        <Bar label="역량 키워드" score={a.scores.skillKeywords} revised={c.interviewFeedback?.revisedScores?.skillKeywords} />
+        <Bar label="안정성" score={a.scores.stability} revised={c.interviewFeedback?.revisedScores?.stability} />
+        <Bar label="포트폴리오" score={a.scores.portfolioMatch} revised={c.interviewFeedback?.revisedScores?.portfolioMatch} />
+        <Bar label="성장 가능성" score={a.scores.growthPotential} revised={c.interviewFeedback?.revisedScores?.growthPotential} />
         <div style={{ marginTop: 11, padding: "9px 11px", background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, color: C.sub, lineHeight: 1.6 }}>{a.summary}</div>
+        <DecisionSummary candidate={c} compact />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 11 }}>
           <button onClick={e => { e.stopPropagation(); onInterview(); }} style={{ padding: "8px", borderRadius: 8, border: "none", background: `linear-gradient(135deg,${C.purple},${C.pink})`, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>🎤 면접 시작</button>
           <button onClick={e => { e.stopPropagation(); onExportPDF(); }} style={{ padding: "8px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.sub, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>📄 PDF 저장</button>
@@ -1602,6 +1658,15 @@ export default function HireL() {
                       </div>
                     )}
                   </div>
+                  {a && !busy && (
+                    <div style={{ marginBottom: 18 }}>
+                      <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>🗳 면접 결과 · 합의</span>
+                        <button onClick={() => { setDecisionCandidateId(c.id); setView("decision"); }} style={{ marginLeft: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 12px", color: C.sub, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>합의·결정 화면 열기 →</button>
+                      </div>
+                      <DecisionSummary candidate={c} />
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 3, marginBottom: 20, background: C.card, padding: 3, borderRadius: 10, width: "fit-content", border: `1px solid ${C.border}` }}>
                     {[["overview", "📊 종합"], ["keywords", "🏷 키워드"], ["interview", "💬 면접 질문"], ["resume", "📄 이력서"]].map(([tab, l]) => (
                       <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 500, background: activeTab === tab ? C.accent : "transparent", color: activeTab === tab ? "#fff" : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{l}</button>
@@ -1621,12 +1686,12 @@ export default function HireL() {
                             <Ring score={a.scores.growthPotential} label="성장가능성" color={C.pink} />
                           </div>
                           <div style={{ height: 1, background: C.border, margin: "0 0 18px" }} />
-                          <Bar label="직무 경험 매칭" score={a.scores.experienceMatch} />
-                          <Bar label="가치관/문화 적합도" score={a.scores.cultureFit} />
-                          <Bar label="역량 키워드 분석" score={a.scores.skillKeywords} />
-                          <Bar label="이직 패턴/안정성" score={a.scores.stability} />
-                          <Bar label="포트폴리오 적합도" score={a.scores.portfolioMatch} />
-                          <Bar label="성장 가능성" score={a.scores.growthPotential} />
+                          <Bar label="직무 경험 매칭" score={a.scores.experienceMatch} revised={c.interviewFeedback?.revisedScores?.experienceMatch} />
+                          <Bar label="가치관/문화 적합도" score={a.scores.cultureFit} revised={c.interviewFeedback?.revisedScores?.cultureFit} />
+                          <Bar label="역량 키워드 분석" score={a.scores.skillKeywords} revised={c.interviewFeedback?.revisedScores?.skillKeywords} />
+                          <Bar label="이직 패턴/안정성" score={a.scores.stability} revised={c.interviewFeedback?.revisedScores?.stability} />
+                          <Bar label="포트폴리오 적합도" score={a.scores.portfolioMatch} revised={c.interviewFeedback?.revisedScores?.portfolioMatch} />
+                          <Bar label="성장 가능성" score={a.scores.growthPotential} revised={c.interviewFeedback?.revisedScores?.growthPotential} />
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
                           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 18 }}>
