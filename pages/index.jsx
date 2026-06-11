@@ -906,6 +906,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
   const [comment, setComment] = useState("");
   const [evals, setEvals] = useState({});
   const pollRef = useRef(null);
+  const lastSavedRef = useRef("");
 
   useEffect(() => { const e = getEvaluator(); setEv(e); setNameInput(e.name || ""); }, []);
 
@@ -952,6 +953,15 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
   const { tally, total } = tallyDecisions(boardEvals);
   const result = decideResult(evals, aiVote);
   const rows = Object.entries(boardEvals).map(([id, v]) => ({ id, ...v, isAI: id === "__ai__" })).sort((x, y) => (x.isAI ? -1 : y.isAI ? 1 : (x.ts || 0) - (y.ts || 0)));
+  // 표가 바뀌면 후보 카드(finalDecision)를 자동 최신화 — 단독이거나 방장만 저장 가능
+  const liveSig = `${result}|${total}|${tally.합격}|${tally.보류}|${tally.불합격}`;
+  const savedSig = candidate.finalDecision ? `${candidate.finalDecision.result}|${candidate.finalDecision.total}|${candidate.finalDecision.tally?.합격 || 0}|${candidate.finalDecision.tally?.보류 || 0}|${candidate.finalDecision.tally?.불합격 || 0}` : "";
+  useEffect(() => {
+    if (!isHost || total === 0) return;
+    if (liveSig === savedSig || liveSig === lastSavedRef.current) return;
+    lastSavedRef.current = liveSig;
+    onSaveFinal(candidate.id, buildFinal(evals, aiVote));
+  }, [liveSig, savedSig, isHost, total]);
   const rs = DEC_STYLE[result] || DEC_STYLE.보류;
   const fd = candidate.finalDecision;
 
@@ -1037,8 +1047,8 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
               ); })}
           </div>
 
-          {isHost && syncEnabled && total > 0 && <button onClick={() => onSaveFinal(candidate.id, { result, tally, total, votes: rows.map(r => ({ name: r.name, decision: r.decision, comment: r.comment || "", isAI: !!r.isAI })), decidedAt: Date.now() })} style={{ ...BP(`linear-gradient(135deg,${rs.c},${rs.c}cc)`), width: "100%" }}>🏁 결과 확정 — 후보 카드에 저장</button>}
-          {!syncEnabled && <div style={{ fontSize: 11, color: C.muted, textAlign: "center", padding: "4px 0" }}>단독 평가는 제출 시 후보 카드에 자동 반영됩니다 · 사람 표 우선(동점만 AI가 결정)</div>}
+          {isHost && <div style={{ fontSize: 11, color: C.muted, textAlign: "center", padding: "4px 0" }}>표가 바뀌면 후보 카드에 자동 반영됩니다 · 사람 표 우선(동점만 AI가 결정)</div>}
+          {!isHost && <div style={{ fontSize: 11, color: C.muted, textAlign: "center", padding: "4px 0" }}>방장 화면에서 최종 결과가 후보 카드에 반영됩니다</div>}
         </div>
       </div>
     </div>
