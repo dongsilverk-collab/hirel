@@ -248,6 +248,33 @@ const DEC_STYLE = {
   보류: { c: "#F59E0B", bg: "rgba(245,158,11,.12)", b: "rgba(245,158,11,.35)" },
   불합격: { c: "#EF4444", bg: "rgba(239,68,68,.12)", b: "rgba(239,68,68,.35)" },
 };
+// 사람 표 우선 결정: 사람 다수가 명확하면 그대로(AI는 참고), 사람이 동점/0명일 때만 AI가 타이브레이크
+function decideResult(humanEvals, aiVote) {
+  const ht = { 합격: 0, 보류: 0, 불합격: 0 };
+  Object.values(humanEvals || {}).forEach(e => { if (ht[e.decision] != null) ht[e.decision]++; });
+  const humanTotal = Object.values(humanEvals || {}).length;
+  const maxH = Math.max(ht.합격, ht.보류, ht.불합격);
+  const topH = ["합격", "보류", "불합격"].filter(k => ht[k] === maxH && maxH > 0);
+  if (topH.length === 1) return topH[0];
+  if (aiVote && aiVote.decision) {
+    if (humanTotal === 0) return aiVote.decision;
+    const t2 = { ...ht }; if (t2[aiVote.decision] != null) t2[aiVote.decision]++;
+    const max2 = Math.max(t2.합격, t2.보류, t2.불합격);
+    const top2 = ["합격", "보류", "불합격"].filter(k => t2[k] === max2);
+    return top2.length === 1 ? top2[0] : "보류";
+  }
+  return "보류";
+}
+function buildFinal(humanEvals, aiVote) {
+  const boardEvals = aiVote ? { ...humanEvals, __ai__: aiVote } : { ...humanEvals };
+  const { tally, total } = tallyDecisions(boardEvals);
+  return {
+    result: decideResult(humanEvals, aiVote),
+    tally, total,
+    votes: Object.entries(boardEvals).map(([id, v]) => ({ name: v.name, decision: v.decision, comment: v.comment || "", isAI: id === "__ai__" })),
+    decidedAt: Date.now(),
+  };
+}
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 function exportCandidatePDF(candidate, position) {
@@ -906,13 +933,17 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
         showToast("평가 제출 완료"); fetchEvals();
       } catch (e) { console.error(e); showToast("제출 실패 — 잠시 후 다시 시도", "error"); }
     } else {
-      setEvals(prev => ({ ...prev, [ev.id]: payload })); showToast("평가 저장 완료");
+      const newEvals = { ...evals, [ev.id]: payload };
+      setEvals(newEvals);
+      const av = (fb && fb.aiVerdict) ? { name: "AI 면접관", decision: fb.aiVerdict, comment: fb.oneliner || fb.summary || "", ts: 0 } : null;
+      onSaveFinal(candidate.id, buildFinal(newEvals, av));
     }
   };
 
   const aiVote = (fb && fb.aiVerdict) ? { name: "AI 면접관", decision: fb.aiVerdict, comment: fb.oneliner || fb.summary || "", ts: 0 } : null;
   const boardEvals = aiVote ? { ...evals, __ai__: aiVote } : { ...evals };
-  const { tally, total, result } = tallyDecisions(boardEvals);
+  const { tally, total } = tallyDecisions(boardEvals);
+  const result = decideResult(evals, aiVote);
   const rows = Object.entries(boardEvals).map(([id, v]) => ({ id, ...v, isAI: id === "__ai__" })).sort((x, y) => (x.isAI ? -1 : y.isAI ? 1 : (x.ts || 0) - (y.ts || 0)));
   const rs = DEC_STYLE[result] || DEC_STYLE.보류;
   const fd = candidate.finalDecision;
@@ -978,7 +1009,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
           <div style={Card}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>👥 합의 보드 ({total}표 · AI 포함)</span>
-              <span style={{ padding: "4px 12px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: rs.bg, border: `1px solid ${rs.b}`, color: rs.c }}>다수결: {result}</span>
+              <span style={{ padding: "4px 12px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: rs.bg, border: `1px solid ${rs.b}`, color: rs.c }}>결과: {result}</span>
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
               {["합격", "보류", "불합격"].map(d => <div key={d} style={{ flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 7, background: C.surface, border: `1px solid ${C.border}` }}>
@@ -999,7 +1030,8 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
               ); })}
           </div>
 
-          {isHost && total > 0 && <button onClick={() => onSaveFinal(candidate.id, { result, tally, total, votes: rows.map(r => ({ name: r.name, decision: r.decision, comment: r.comment || "", isAI: !!r.isAI })), decidedAt: Date.now() })} style={{ ...BP(`linear-gradient(135deg,${rs.c},${rs.c}cc)`), width: "100%" }}>🏁 다수결 결과 확정 — 후보 카드에 저장</button>}
+          {isHost && syncEnabled && total > 0 && <button onClick={() => onSaveFinal(candidate.id, { result, tally, total, votes: rows.map(r => ({ name: r.name, decision: r.decision, comment: r.comment || "", isAI: !!r.isAI })), decidedAt: Date.now() })} style={{ ...BP(`linear-gradient(135deg,${rs.c},${rs.c}cc)`), width: "100%" }}>🏁 결과 확정 — 후보 카드에 저장</button>}
+          {!syncEnabled && <div style={{ fontSize: 11, color: C.muted, textAlign: "center", padding: "4px 0" }}>단독 평가는 제출 시 후보 카드에 자동 반영됩니다 · 사람 표 우선(동점만 AI가 결정)</div>}
         </div>
       </div>
     </div>
