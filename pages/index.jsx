@@ -911,8 +911,15 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
 
   const fetchEvals = async () => {
     if (!syncEnabled || !roomId) return;
-    try { const r = await fetch(`/api/eval?roomId=${roomId}&candidateId=${candidate.id}`); if (r.ok) { const d = await r.json(); setEvals(d || {}); } }
-    catch (e) { console.error("평가 불러오기 실패:", e); }
+    try {
+      const r = await fetch(`/api/eval?roomId=${roomId}&candidateId=${candidate.id}`);
+      if (r.ok) {
+        const d = await r.json();
+        const clean = {};
+        Object.entries(d || {}).forEach(([k, v]) => { if (v && typeof v === "object" && ["합격", "보류", "불합격"].includes(v.decision)) clean[k] = v; });
+        setEvals(clean);
+      }
+    } catch (e) { console.error("평가 불러오기 실패:", e); }
   };
   useEffect(() => {
     if (syncEnabled && roomId) { fetchEvals(); pollRef.current = setInterval(fetchEvals, 2500); return () => clearInterval(pollRef.current); }
@@ -928,10 +935,10 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
     if (syncEnabled && roomId) {
       try {
         const r = await fetch(`/api/eval?roomId=${roomId}&candidateId=${candidate.id}&evaluatorId=${ev.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-        if (!r.ok) throw new Error("HTTP " + r.status);
+        if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error || ("HTTP " + r.status)); }
         setEvals(prev => ({ ...prev, [ev.id]: payload }));
         showToast("평가 제출 완료"); fetchEvals();
-      } catch (e) { console.error(e); showToast("제출 실패 — 잠시 후 다시 시도", "error"); }
+      } catch (e) { console.error(e); showToast("제출 실패: " + e.message, "error"); }
     } else {
       const newEvals = { ...evals, [ev.id]: payload };
       setEvals(newEvals);
