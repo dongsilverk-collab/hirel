@@ -1257,6 +1257,226 @@ function PortfolioCheck({ candidate, onUpdate, compact }) {
   );
 }
 
+// ─── 첨부 개수 (업로드 파일 + 사내 폴더 경로 참조 합산) ─────────────────────────
+const attachCount = (c) => ((c.fileRefs?.length) || 0) + ((c.fileNames?.length) || 0);
+
+// ─── 수동 채점 (v2 축 6개) — AI vs 수동 나란히 비교 ─────────────────────────────
+function ManualV2Card({ candidate, onSave, showToast }) {
+  const ai = candidate.analysis?.v2Scores || null;
+  const [draft, setDraft] = useState(() => V2_AXES.reduce((o, [k]) => ({ ...o, [k]: 0 }), {}));
+  const [scorer, setScorer] = useState("");
+  useEffect(() => {
+    const ev = getEvaluator();
+    setScorer(candidate.manualScoredBy || ev.name || "");
+    const ms = candidate.manualScores || {};
+    setDraft(V2_AXES.reduce((o, [k]) => ({ ...o, [k]: Number(ms[k]) || 0 }), {}));
+  }, [candidate.id]);
+  const aiTotal = ai ? v2WeightedTotal(ai) : null;
+  const manualTotal = v2WeightedTotal(draft);
+  const set = (k, v) => setDraft(p => ({ ...p, [k]: v }));
+  const save = () => {
+    const by = (scorer || "").trim() || "평가자";
+    setEvaluatorName(by);
+    onSave({ manualScores: { ...draft }, manualScoredBy: by, manualScoredAt: Date.now() });
+    showToast(`수동 채점 저장 — ${manualTotal}점 (${by})`);
+  };
+  const IS2 = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: "7px 10px", fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+  return (
+    <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>🎯 큐라엘 v2 축 — AI vs 수동</h3>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 12 }}>
+        <span style={{ fontSize: 11, color: C.purple, fontWeight: 600 }}>AI 가중총점 <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'DM Mono',monospace", color: aiTotal != null ? sc(aiTotal) : C.muted }}>{aiTotal != null ? aiTotal : "—"}</span></span>
+        <span style={{ fontSize: 11, color: C.accent, fontWeight: 600 }}>수동 가중총점 <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'DM Mono',monospace", color: sc(manualTotal) }}>{manualTotal}</span></span>
+        {!ai && <span style={{ fontSize: 10, color: C.muted }}>AI 분석 없이도 수동 채점 가능</span>}
+      </div>
+      {V2_AXES.map(([key, label, w]) => {
+        const av = ai ? (Number(ai[key]) || 0) : null;
+        const mv = Number(draft[key]) || 0;
+        return (
+          <div key={key} style={{ marginBottom: 10, paddingBottom: 8, borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: C.sub }}>{label}</span>
+              <span style={{ fontSize: 10, color: C.muted, marginLeft: 5 }}>x{w}</span>
+              <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: "'DM Mono',monospace" }}>
+                <span style={{ color: C.purple }}>AI {av != null ? av : "—"}</span>
+                <span style={{ color: C.muted }}> · </span>
+                <span style={{ color: C.accent, fontWeight: 700 }}>수동 {mv}</span>
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 3 }}>
+              <span style={{ width: 26, fontSize: 9, fontWeight: 700, color: C.purple }}>AI</span>
+              <div style={{ flex: 1, height: 5, background: C.border, borderRadius: 3, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${((av || 0) / 5) * 100}%`, background: C.purple, borderRadius: 3, transition: "width .4s ease" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
+              <span style={{ width: 26, fontSize: 9, fontWeight: 700, color: C.accent }}>수동</span>
+              <div style={{ flex: 1, height: 5, background: C.border, borderRadius: 3, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${(mv / 5) * 100}%`, background: C.accent, borderRadius: 3, transition: "width .2s ease" }} />
+              </div>
+            </div>
+            <input type="range" min={0} max={5} step={0.5} value={mv} onChange={e => set(key, Number(e.target.value))} style={{ width: "100%", accentColor: C.accent, cursor: "pointer", margin: 0 }} />
+          </div>
+        );
+      })}
+      <div style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 4 }}>
+        <input value={scorer} onChange={e => setScorer(e.target.value)} placeholder="채점자 이름" style={{ ...IS2, flex: "0 0 130px" }} />
+        <button onClick={save} style={{ flex: 1, background: `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 7, color: "#fff", padding: "8px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>수동 채점 저장</button>
+      </div>
+      {candidate.manualScoredAt && (
+        <div style={{ fontSize: 10, color: C.muted, marginTop: 7 }}>마지막 저장: {candidate.manualScoredBy || "평가자"} · {new Date(candidate.manualScoredAt).toLocaleString("ko-KR")} · 저장 총점 {candidate.manualScores ? v2WeightedTotal(candidate.manualScores) : "—"}점</div>
+      )}
+    </div>
+  );
+}
+
+// ─── 📎 첨부 자료 (D안: 원본은 사내 폴더 보관, 앱은 파일명+경로 안내) ────────────
+function FileRefsSection({ candidate, onUpdate, showToast }) {
+  const refs = candidate.fileRefs || [];
+  const [fname, setFname] = useState("");
+  const [fpath, setFpath] = useState("");
+  useEffect(() => { setFname(""); setFpath(""); }, [candidate.id]);
+  const copyPath = async (p) => {
+    try { await navigator.clipboard.writeText(p); showToast("경로 복사됨 — 탐색기 주소창에 붙여넣으세요"); }
+    catch (e) { showToast("경로 복사 실패 — 브라우저 권한을 확인하세요", "error"); }
+  };
+  const add = () => {
+    const n = fname.trim(), p = fpath.trim();
+    if (!n || !p) { showToast("파일명과 경로를 모두 입력하세요", "error"); return; }
+    onUpdate([...refs, { name: n, path: p }]);
+    setFname(""); setFpath("");
+  };
+  const remove = (i) => onUpdate(refs.filter((_, j) => j !== i));
+  const IS2 = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: "7px 10px", fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+  return (
+    <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 14 }}>
+      {refs.length === 0
+        ? <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>원본 파일은 사내 폴더에 보관하세요. 파일명과 경로를 등록해두면 팀원이 바로 찾을 수 있어요.</div>
+        : <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10 }}>
+          {refs.map((r, i) => (
+            <div key={i} title={r.path} style={{ display: "flex", alignItems: "center", gap: 7, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px", maxWidth: 360 }}>
+              <span style={{ fontSize: 13 }}>📎</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+              <button onClick={() => copyPath(r.path)} style={{ background: C.glow, border: `1px solid ${C.accent}40`, borderRadius: 6, color: C.accent, cursor: "pointer", fontSize: 10, fontWeight: 700, padding: "2px 8px", fontFamily: "inherit", whiteSpace: "nowrap" }}>경로 복사</button>
+              <button onClick={() => remove(i)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 12, padding: 0 }}>✕</button>
+            </div>
+          ))}
+        </div>}
+      <div style={{ display: "flex", gap: 6 }}>
+        <input value={fname} onChange={e => setFname(e.target.value)} placeholder="파일명 (예: 포트폴리오.pdf)" style={{ ...IS2, flex: "0 0 190px" }} />
+        <input value={fpath} onChange={e => setFpath(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder={"경로 (예: \\\\NAS\\채용\\홍길동\\포트폴리오.pdf)"} style={{ ...IS2, flex: 1 }} />
+        <button onClick={add} style={{ background: `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 7, color: "#fff", padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>추가</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── 🗂 자료실 뷰 (플랫폼 통합 테이블) ──────────────────────────────────────────
+function LibraryView({ candidates, positions, onSelect }) {
+  const [sortKey, setSortKey] = useState("name");
+  const [sortDir, setSortDir] = useState(1);
+  const posName = (id) => positions.find(p => p.id === id)?.name || "미지정";
+  const aiScore = (c) => c.analysis?.totalScore ?? null;
+  const manualScore = (c) => c.manualScores ? v2WeightedTotal(c.manualScores) : null;
+  const toggle = (key) => { if (sortKey === key) setSortDir(d => -d); else { setSortKey(key); setSortDir(key === "name" ? 1 : -1); } };
+  const sorted = [...candidates].sort((a, b) => {
+    if (sortKey === "name") return a.name.localeCompare(b.name, "ko") * sortDir;
+    let va = 0, vb = 0;
+    if (sortKey === "ai") { va = aiScore(a) ?? -1; vb = aiScore(b) ?? -1; }
+    else if (sortKey === "manual") { va = manualScore(a) ?? -1; vb = manualScore(b) ?? -1; }
+    else if (sortKey === "stage") { va = STAGES.indexOf(a.stage || "서류검토"); vb = STAGES.indexOf(b.stage || "서류검토"); }
+    else if (sortKey === "files") { va = attachCount(a); vb = attachCount(b); }
+    return (va - vb) * sortDir;
+  });
+  const channelStats = CHANNELS.map(ch => ({ ch, n: candidates.filter(c => (c.channel || "기타") === ch).length })).filter(s => s.n > 0);
+  const pcDone = candidates.filter(c => c.portfolioCheck?.checked).length;
+  const manualDone = candidates.filter(c => c.manualScores).length;
+  const Card = { background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)" };
+  const th = (label, key, center) => (
+    <th key={label} onClick={key ? () => toggle(key) : undefined}
+      style={{ textAlign: center ? "center" : "left", padding: "10px 12px", color: sortKey === key ? C.accent : C.muted, fontSize: 12, fontWeight: 600, borderBottom: `1px solid ${C.border}`, cursor: key ? "pointer" : "default", userSelect: "none", whiteSpace: "nowrap" }}>
+      {label}{key && sortKey === key ? (sortDir === 1 ? " ▲" : " ▼") : ""}
+    </th>
+  );
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🗂 자료실</h2>
+          <span style={{ fontSize: 12, color: C.sub }}>전체 후보 통합 테이블 · 컬럼 헤더 클릭으로 정렬 · 행 클릭으로 상세 이동</span>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {channelStats.map(s => (
+          <div key={s.ch} style={{ ...Card, padding: "8px 14px", display: "flex", alignItems: "center", gap: 7 }}>
+            <ChannelBadge channel={s.ch} small />
+            <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'DM Mono',monospace", color: C.text }}>{s.n}</span>
+          </div>
+        ))}
+        <div style={{ ...Card, padding: "8px 14px", display: "flex", alignItems: "center", gap: 7 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.green }}>✓ 포트폴리오 확인</span>
+          <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'DM Mono',monospace", color: C.green }}>{pcDone}</span>
+          <span style={{ fontSize: 11, color: C.muted }}>/ {candidates.length}</span>
+        </div>
+        <div style={{ ...Card, padding: "8px 14px", display: "flex", alignItems: "center", gap: 7 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.accent }}>✎ 수동 채점 완료</span>
+          <span style={{ fontSize: 14, fontWeight: 800, fontFamily: "'DM Mono',monospace", color: C.accent }}>{manualDone}</span>
+          <span style={{ fontSize: 11, color: C.muted }}>/ {candidates.length}</span>
+        </div>
+      </div>
+      <div style={{ ...Card, padding: 0, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead><tr style={{ background: C.surface }}>
+              {th("이름", "name")}
+              {th("채널", null)}
+              {th("포지션", null)}
+              {th("단계", "stage", true)}
+              {th("파일", "files", true)}
+              {th("AI 총점", "ai", true)}
+              {th("수동 총점", "manual", true)}
+              {th("포트폴리오", null, true)}
+              {th("최종 판정", null, true)}
+            </tr></thead>
+            <tbody>
+              {sorted.length === 0 && (
+                <tr><td colSpan={9} style={{ padding: "26px 12px", textAlign: "center", color: C.muted, fontSize: 13 }}>표시할 후보가 없습니다 — 필터를 확인하세요</td></tr>
+              )}
+              {sorted.map(c => {
+                const stage = c.stage || "서류검토";
+                const stCol = STAGE_COLORS[stage] || C.sub;
+                const ais = aiScore(c), ms = manualScore(c);
+                const fd = c.finalDecision?.result;
+                const fds = DEC_STYLE[fd] || {};
+                const nFiles = attachCount(c);
+                return (
+                  <tr key={c.id} onClick={() => onSelect(c.id)} style={{ cursor: "pointer", transition: "background .15s" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = C.surface; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>{c.name}{c.age ? <span style={{ fontWeight: 400, color: C.muted, fontSize: 11 }}> · {c.age}세</span> : ""}</td>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}` }}><ChannelBadge channel={c.channel} small /></td>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, color: C.sub, whiteSpace: "nowrap" }}>{posName(c.positionId)}</td>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, textAlign: "center" }}>
+                      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: `${stCol}18`, border: `1px solid ${stCol}40`, color: stCol, fontWeight: 600, whiteSpace: "nowrap" }}>{stage}</span>
+                    </td>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, textAlign: "center", color: nFiles > 0 ? C.sub : C.muted, fontSize: 12, whiteSpace: "nowrap" }}>{nFiles > 0 ? `📎${nFiles}` : "—"}</td>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, textAlign: "center", fontWeight: 700, fontFamily: "'DM Mono',monospace", color: ais != null ? sc(ais) : C.muted }}>{ais != null ? ais : "—"}</td>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, textAlign: "center", fontWeight: 700, fontFamily: "'DM Mono',monospace", color: ms != null ? sc(ms) : C.muted }}>{ms != null ? ms : "—"}</td>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, textAlign: "center", color: c.portfolioCheck?.checked ? C.green : C.muted, fontWeight: 700 }}>{c.portfolioCheck?.checked ? "✓" : "—"}</td>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, textAlign: "center", fontWeight: 700, color: fd ? fds.c : C.muted, whiteSpace: "nowrap" }}>{fd || "미정"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Candidate Card ───────────────────────────────────────────────────────────
 function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onReanalyze, onExportPDF, onDecision, position }) {
   const busy = analyzingIds.has(c.id);
@@ -1274,9 +1494,10 @@ function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onR
             <span style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</span>
             <ChannelBadge channel={c.channel} small />
           </div>
-          <div style={{ fontSize: 11, color: C.sub }}>{c.age ? `${c.age}세` : ""}{c.fileNames?.length > 0 && <span style={{ marginLeft: 5 }}>📎{c.fileNames.length}</span>}</div>
+          <div style={{ fontSize: 11, color: C.sub }}>{c.age ? `${c.age}세` : ""}{attachCount(c) > 0 && <span style={{ marginLeft: 5 }}>📎{attachCount(c)}</span>}</div>
         </div>
-        {(c.finalDecision || c.interviewFeedback || (!busy && a)) && <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+        {(c.finalDecision || c.interviewFeedback || c.manualScores || (!busy && a)) && <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {c.manualScores && <span style={{ padding: "3px 9px", borderRadius: 16, fontSize: 10, fontWeight: 700, background: C.glow, border: `1px solid ${C.accent}40`, color: C.accent }}>수동 {v2WeightedTotal(c.manualScores)}</span>}
           {c.interviewFeedback && <span style={{ padding: "3px 9px", borderRadius: 16, fontSize: 10, fontWeight: 700, background: "rgba(139,92,246,.15)", border: "1px solid rgba(139,92,246,.35)", color: C.purple }}>면접 완료</span>}
           {c.finalDecision && <span style={{ padding: "3px 10px", borderRadius: 16, fontSize: 11, fontWeight: 700, background: (DEC_STYLE[c.finalDecision.result] || {}).bg, border: `1px solid ${(DEC_STYLE[c.finalDecision.result] || {}).b}`, color: (DEC_STYLE[c.finalDecision.result] || {}).c }}>{c.finalDecision.result}</span>}
           {!busy && a && <span style={{ padding: "3px 10px", borderRadius: 16, fontSize: 11, fontWeight: 700, background: vStyle(a.verdict).bg, border: `1px solid ${vStyle(a.verdict).border}`, color: vStyle(a.verdict).color }}>{a.verdict}</span>}
@@ -1394,6 +1615,10 @@ export default function HireL() {
           stage: c.stage || "서류검토",
           portfolioCheck: c.portfolioCheck || null,
           fileNames: c.fileNames || [],
+          fileRefs: c.fileRefs || [],
+          manualScores: c.manualScores || null,
+          manualScoredBy: c.manualScoredBy || null,
+          manualScoredAt: c.manualScoredAt || null,
           resume: (c.resume||"").slice(0, 300),
           files: [],
           analysis: c.analysis ? {
@@ -1634,6 +1859,10 @@ export default function HireL() {
           channel: c.channel || "기타",
           stage: c.stage || "서류검토",
           portfolioCheck: c.portfolioCheck || null,
+          fileRefs: c.fileRefs || [],
+          manualScores: c.manualScores || null,
+          manualTotal: c.manualScores ? v2WeightedTotal(c.manualScores) : null,
+          manualScoredBy: c.manualScoredBy || null,
           analysisScore: v2 ? v2WeightedTotal(v2) : (c.analysis?.totalScore ?? null),
           aiVerdict: fb?.aiVerdict || c.analysis?.verdict || null,
           finalDecision: c.finalDecision?.result || null,
@@ -1732,7 +1961,7 @@ export default function HireL() {
             <span style={{ fontSize: 10, color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: "2px 7px", borderRadius: 18 }}>BETA</span>
           </div>
           <div style={{ display: "flex", gap: 3 }}>
-            {[["dashboard", "◫ 대시보드"], ["board", "▦ 보드"], ["detail", "◉ 상세 분석"], ["report", "📊 채용 리포트"]].map(([v, l]) => (
+            {[["dashboard", "◫ 대시보드"], ["board", "▦ 보드"], ["library", "🗂 자료실"], ["detail", "◉ 상세 분석"], ["report", "📊 채용 리포트"]].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)} style={{ padding: "5px 14px", borderRadius: 7, border: "none", fontSize: 13, fontWeight: 500, background: view === v ? C.glow : "transparent", color: view === v ? C.accent : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{l}</button>
             ))}
           </div>
@@ -1800,7 +2029,7 @@ export default function HireL() {
             );
           })}
         </div>
-        {(view === "dashboard" || view === "board") && (
+        {(view === "dashboard" || view === "board" || view === "library") && (
           <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", alignItems: "center", gap: 6, padding: "8px 0 10px", flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, color: C.muted, marginRight: 2 }}>채널</span>
             <button onClick={() => setSelectedChannel("all")} style={{ padding: "3px 11px", borderRadius: 14, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: selectedChannel === "all" ? C.glow : "transparent", border: `1px solid ${selectedChannel === "all" ? C.accent : C.border}`, color: selectedChannel === "all" ? C.accent : C.sub }}>
@@ -1823,6 +2052,9 @@ export default function HireL() {
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 28px" }}>
         {view === "report" && (
           <ReportView candidates={candidates} positions={positions} onExport={() => exportRecruitmentReport(candidates, positions)} />
+        )}
+        {view === "library" && (
+          <LibraryView candidates={filteredCandidates} positions={positions} onSelect={(id) => { setSelectedCandidateId(id); setActiveTab("overview"); setView("detail"); }} />
         )}
         {view === "board" && (
           <div>
@@ -1860,6 +2092,8 @@ export default function HireL() {
                           <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
                             <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: `${rc.accent}20`, border: `1px solid ${rc.accent}40`, color: rc.accent, fontWeight: 600 }}>{pos?.name || "미지정"}</span>
                             <ChannelBadge channel={c.channel} small />
+                            {c.manualScores && <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 10, background: C.glow, border: `1px solid ${C.accent}40`, color: C.accent, whiteSpace: "nowrap" }}>수동 {v2WeightedTotal(c.manualScores)}</span>}
+                            {attachCount(c) > 0 && <span style={{ fontSize: 10, color: C.muted, whiteSpace: "nowrap" }}>📎{attachCount(c)}</span>}
                           </div>
                           {c.portfolioCheck?.checked && (
                             <div style={{ fontSize: 10, fontWeight: 600, color: C.green, marginBottom: 6 }}>✓ 포트폴리오 확인됨 ({c.portfolioCheck.by || "확인자"} · {c.portfolioCheck.at ? new Date(c.portfolioCheck.at).toLocaleDateString("ko-KR") : ""})</div>
@@ -1949,7 +2183,7 @@ export default function HireL() {
                         <ChannelBadge channel={c.channel} />
                         <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 12, background: `${STAGE_COLORS[c.stage || "서류검토"]}18`, border: `1px solid ${STAGE_COLORS[c.stage || "서류검토"]}40`, color: STAGE_COLORS[c.stage || "서류검토"], fontWeight: 600 }}>{c.stage || "서류검토"}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: C.sub }}>{c.age ? `${c.age}세` : ""}{c.fileNames?.length > 0 && <span style={{ marginLeft: 8 }}>📎{c.fileNames.join(", ")}</span>}</div>
+                      <div style={{ fontSize: 12, color: C.sub }}>{c.age ? `${c.age}세` : ""}{attachCount(c) > 0 && <span style={{ marginLeft: 8 }}>📎{attachCount(c)} · {[...(c.fileNames || []), ...((c.fileRefs || []).map(r => r.name))].join(", ")}</span>}</div>
                     </div>
                     {a && !busy && (
                       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
@@ -1968,6 +2202,10 @@ export default function HireL() {
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>📁 포트폴리오 확인</div>
                     <PortfolioCheck candidate={c} onUpdate={pc => updateCandidate(c.id, { portfolioCheck: pc })} />
                   </div>
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>📎 첨부 자료 <span style={{ fontWeight: 400, color: C.muted }}>· 원본은 사내 폴더 보관, 여기엔 경로만</span></div>
+                    <FileRefsSection candidate={c} onUpdate={fr => updateCandidate(c.id, { fileRefs: fr })} showToast={showToast} />
+                  </div>
                   {a && !busy && (
                     <div style={{ marginBottom: 18 }}>
                       <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
@@ -1982,7 +2220,14 @@ export default function HireL() {
                       <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: "7px 16px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 500, background: activeTab === tab ? C.accent : "transparent", color: activeTab === tab ? "#fff" : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{l}</button>
                     ))}
                   </div>
-                  {busy ? <Spin label="AI가 분석하고 있습니다..." /> : !a ? <div style={{ textAlign: "center", padding: "50px 0" }}><button onClick={() => doAnalyze(c)} style={BP()}>AI 분석 시작</button></div> : (<>
+                  {busy ? <Spin label="AI가 분석하고 있습니다..." /> : !a ? (
+                    <div>
+                      <div style={{ textAlign: "center", padding: "26px 0" }}><button onClick={() => doAnalyze(c)} style={BP()}>AI 분석 시작</button></div>
+                      <div style={{ maxWidth: 560 }}>
+                        <ManualV2Card candidate={c} onSave={patch => updateCandidate(c.id, patch)} showToast={showToast} />
+                      </div>
+                    </div>
+                  ) : (<>
                     {activeTab === "overview" && (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                         <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 22 }}>
@@ -2008,34 +2253,7 @@ export default function HireL() {
                             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 9 }}>✦ AI 요약</h3>
                             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, margin: 0 }}>{a.summary}</p>
                           </div>
-                          {a.v2Scores && (
-                            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                                <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>🎯 큐라엘 v2 축</h3>
-                                <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, color: sc(v2WeightedTotal(a.v2Scores)), fontFamily: "'DM Mono',monospace" }}>{v2WeightedTotal(a.v2Scores)}점</span>
-                                <span style={{ fontSize: 10, color: C.muted }}>가중 총점</span>
-                              </div>
-                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                                <tbody>
-                                  {V2_AXES.map(([key, label, w]) => {
-                                    const v = Number(a.v2Scores[key]) || 0;
-                                    return (
-                                      <tr key={key}>
-                                        <td style={{ padding: "5px 4px", color: C.sub, borderBottom: `1px solid ${C.border}` }}>{label}</td>
-                                        <td style={{ padding: "5px 4px", textAlign: "right", color: C.muted, fontSize: 10, borderBottom: `1px solid ${C.border}` }}>x{w}</td>
-                                        <td style={{ padding: "5px 4px", width: 90, borderBottom: `1px solid ${C.border}` }}>
-                                          <div style={{ height: 5, background: C.border, borderRadius: 3, overflow: "hidden" }}>
-                                            <div style={{ height: "100%", width: `${(v / 5) * 100}%`, background: C.purple, borderRadius: 3 }} />
-                                          </div>
-                                        </td>
-                                        <td style={{ padding: "5px 4px", textAlign: "right", fontWeight: 700, color: C.text, fontFamily: "'DM Mono',monospace", borderBottom: `1px solid ${C.border}`, width: 38 }}>{v}/5</td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
+                          <ManualV2Card candidate={c} onSave={patch => updateCandidate(c.id, patch)} showToast={showToast} />
                           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
                             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 9 }}>강점</h3>
                             {a.strengths?.map((s, i) => <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}><span style={{ color: C.green }}>✓</span><span style={{ fontSize: 13, color: C.sub }}>{s}</span></div>)}
