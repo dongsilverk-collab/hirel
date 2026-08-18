@@ -204,21 +204,27 @@ ${isMarketer ? `
   return JSON.parse(m1[0]);
 }
 
-async function scoreInterview(jd, name, transcript, questions) {
+async function scoreInterview(jd, name, transcript, questions, qList) {
   const allQ = questions ? [...(questions.culture||[]),...(questions.skill||[]),...(questions.future||[]),...(questions.killpath||[]),...(questions.growth||[]),...(questions.dataSkill||[]),...(questions.execution||[])] : [];
+  const qBlock = (qList && qList.length)
+    ? qList.map(q => `[${q.key}] ${q.text}`).join("\n")
+    : (allQ.join(" / ") || "자유 면접");
   const prompt = `당신은 큐라엘(CURAEL) 전담 면접관 AI입니다.
 ${CURAEL_CULTURE}
 채용 포지션 JD: ${jd.slice(0, 300)}
 후보자: ${name}
-준비된 질문: ${allQ.join(" / ") || "자유 면접"}
+준비된 질문 목록 (각 줄 맨 앞 [대괄호] 안이 그 질문의 key):
+${qBlock}
 
 === 지금까지의 면접 녹취록 ===
 ${transcript}
 
 위 녹취록을 실시간 평가하세요. 큐라엘 컬쳐핏(일당백, 환자 중심, 자율과 책임)을 중점 반영하세요.
+추가로: 녹취록에서 특정 질문에 대한 후보자의 답변이 실제로 확인되는 경우에만, 그 질문의 key 그대로 1~5점과 근거 한 줄을 "questionScores" 배열에 담으세요. 답변이 확인되지 않은 질문은 배열에서 제외하세요. 확인된 질문이 없으면 빈 배열 []로 두세요.
 순수 JSON으로만:
-{"liveScore":숫자(0-100),"dimensions":{"communication":숫자,"expertise":숫자,"motivation":숫자,"problemSolving":숫자,"culture":숫자},"highlights":["인상적인 발언 요약1","인상적인 발언 요약2"],"concerns":["우려 포인트1"],"nextQuestion":"지금 상황에서 가장 적절한 다음 질문","oneliner":"현재까지 한줄 평가"}`;
-  const data = await callAI({ messages: [{ role: "user", content: prompt }] });
+{"liveScore":숫자(0-100),"dimensions":{"communication":숫자,"expertise":숫자,"motivation":숫자,"problemSolving":숫자,"culture":숫자},"highlights":["인상적인 발언 요약1","인상적인 발언 요약2"],"concerns":["우려 포인트1"],"nextQuestion":"지금 상황에서 가장 적절한 다음 질문","oneliner":"현재까지 한줄 평가","questionScores":[{"key":"skill-0","score":4,"evidence":"근거 한 줄"}]}`;
+  // 실시간 평가는 속도가 중요 — 빠른 모델(Haiku) 사용 (심층 이력서 분석은 sonnet-5 유지)
+  const data = await callAI({ model: "claude-haiku-4-5-20251001", messages: [{ role: "user", content: prompt }] });
   const raw2 = data.content.map(b => b.text || "").join("");
   const m2 = raw2.match(/\{[\s\S]*\}/);
   if (!m2) throw new Error("JSON 없음");
@@ -689,8 +695,138 @@ function UploadZone({ onReady, maxFiles = 3, onLimit }) {
   );
 }
 
+// ─── 질문별 채점: 섹션 정의 + 헬퍼 ─────────────────────────────────────────────
+const Q_SECTION_DEFS = [
+  ["culture", "🧡 인성/컬쳐핏", C.amber],
+  ["skill", "💼 직무 역량", C.accent],
+  ["future", "🚀 미래/방향성", C.purple],
+  ["killpath", "⚠️ 킬패스/단점", C.red],
+  ["growth", "💡 자기계발", C.green],
+  ["dataSkill", "📊 데이터 실전능력", C.teal],
+  ["execution", "⚡ 실행력", "#F97316"],
+];
+// AI 생성 질문 + 직접 추가 질문(customQuestions)을 섹션 구조로 합침.
+// questionKey: AI 질문 "섹션-인덱스" (예: skill-0) / 직접 추가 "섹션-c고유id" (예: skill-cabc123)
+function buildQuestionSections(candidate) {
+  const iq = candidate?.analysis?.interviewQuestions;
+  const custom = candidate?.customQuestions || {};
+  const withCustom = (secKey, base) => [
+    ...base,
+    ...(custom[secKey] || []).map(cq => ({ key: `${secKey}-c${cq.id}`, text: cq.text, custom: true, id: cq.id })),
+  ];
+  if (iq && typeof iq === "object" && !Array.isArray(iq)) {
+    return Q_SECTION_DEFS.map(([secKey, label, color]) => ({
+      secKey, label, color,
+      items: withCustom(secKey, (iq[secKey] || []).map((q, i) => ({ key: `${secKey}-${i}`, text: q, custom: false }))),
+    }));
+  }
+  if (Array.isArray(iq)) {
+    return [{ secKey: "legacy", label: "💬 면접 질문", color: C.accent, items: withCustom("legacy", iq.map((q, i) => ({ key: `legacy-${i}`, text: q, custom: false }))) }];
+  }
+  // 분석 전 후보: 직접 추가 질문만 담는 섹션 하나
+  return [{ secKey: "extra", label: "✍️ 직접 추가 질문", color: C.accent, items: withCustom("extra", []) }];
+}
+
+// ─── 질문 카드 한 줄 (접기/펼치기 + 1~5 수동 채점 + 메모 + AI 근거) ─────────────
+function QuestionRow({ item, color, entry, open, onToggle, onManual, onNote, onDelete }) {
+  const [noteDraft, setNoteDraft] = useState(entry?.note || "");
+  useEffect(() => { setNoteDraft(entry?.note || ""); }, [entry?.note]);
+  const manual = entry?.manual ?? null;
+  const ai = entry?.ai ?? null;
+  const saveNote = () => { if ((entry?.note || "") !== noteDraft) onNote(noteDraft); };
+  return (
+    <div style={{ background: C.surface, borderRadius: 8, border: `1px solid ${open ? `${color}55` : C.border}`, marginBottom: 6, overflow: "hidden" }}>
+      <div onClick={onToggle} style={{ display: "flex", gap: 9, padding: "9px 12px", cursor: "pointer", alignItems: "flex-start" }}>
+        <span style={{ minWidth: 20, height: 20, borderRadius: 5, background: `${color}20`, color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, fontFamily: "'DM Mono',monospace" }}>Q</span>
+        <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, flex: 1 }}>{item.text}</span>
+        <span style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0, paddingTop: 1 }}>
+          {item.custom && <span style={{ fontSize: 9, fontWeight: 700, color: C.teal, background: `${C.teal}15`, border: `1px solid ${C.teal}35`, padding: "1px 6px", borderRadius: 8, whiteSpace: "nowrap" }}>직접 추가</span>}
+          {manual != null && <span style={{ fontSize: 10, fontWeight: 700, color: C.accent, background: `${C.accent}15`, border: `1px solid ${C.accent}35`, padding: "1px 7px", borderRadius: 9, whiteSpace: "nowrap" }}>내 {manual}점</span>}
+          {ai != null && <span style={{ fontSize: 10, fontWeight: 700, color: C.purple, background: `${C.purple}15`, border: `1px solid ${C.purple}35`, padding: "1px 7px", borderRadius: 9, whiteSpace: "nowrap" }}>AI {ai}점</span>}
+          {item.custom && <button onClick={(e) => { e.stopPropagation(); onDelete(); }} title="질문 삭제" style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 12, padding: "0 2px", lineHeight: 1 }}>✕</button>}
+        </span>
+      </div>
+      {open && (
+        <div style={{ padding: "0 12px 11px 41px" }}>
+          <div style={{ display: "flex", gap: 5, alignItems: "center", marginBottom: 7 }}>
+            <span style={{ fontSize: 11, color: C.muted, marginRight: 3 }}>내 채점</span>
+            {[1, 2, 3, 4, 5].map(n => {
+              const on = manual != null && n <= manual;
+              return (
+                <button key={n} onClick={() => onManual(manual === n ? null : n)}
+                  style={{ width: 26, height: 26, borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: on ? C.accent : C.card, border: `1px solid ${on ? C.accent : C.borderL}`, color: on ? "#fff" : C.sub, transition: "all .12s" }}>{n}</button>
+              );
+            })}
+            {manual != null && <span style={{ fontSize: 10, color: C.muted }}>같은 점수 재클릭 시 해제</span>}
+          </div>
+          <input value={noteDraft} onChange={e => setNoteDraft(e.target.value)} onBlur={saveNote}
+            onKeyDown={e => { if (e.key === "Enter") { saveNote(); e.currentTarget.blur(); } }}
+            placeholder="한 줄 메모 (Enter 또는 포커스 아웃 시 저장)"
+            style={{ width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: "7px 10px", fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+          {entry?.aiEvidence && <div style={{ fontSize: 11, color: C.muted, marginTop: 6, lineHeight: 1.5 }}>🤖 AI 근거 · {entry.aiEvidence}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── 질문별 점수 요약 표 (섹션 평균 포함) — 합의 화면·후보 상세 공용 ────────────
+function QuestionScoreSummary({ candidate, title }) {
+  const qs = candidate?.questionScores || {};
+  const sections = buildQuestionSections(candidate)
+    .map(s => ({ ...s, items: s.items.filter(it => { const e = qs[it.key]; return e && (e.manual != null || e.ai != null); }) }))
+    .filter(s => s.items.length > 0);
+  if (!sections.length) return null;
+  const avg = (vals) => vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : null;
+  const cell = { padding: "7px 10px", fontSize: 12, borderBottom: `1px solid ${C.border}`, textAlign: "left", verticalAlign: "top", color: C.text };
+  return (
+    <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 18 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 12 }}>{title || "📝 질문별 채점 요약"}</div>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={{ ...cell, color: C.muted, fontSize: 11, fontWeight: 600 }}>질문</th>
+            <th style={{ ...cell, color: C.accent, fontSize: 11, fontWeight: 600, width: 56, textAlign: "center" }}>내 점수</th>
+            <th style={{ ...cell, color: C.purple, fontSize: 11, fontWeight: 600, width: 56, textAlign: "center" }}>AI 점수</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sections.map(s => {
+            const mAvg = avg(s.items.map(it => qs[it.key]?.manual).filter(v => v != null));
+            const aAvg = avg(s.items.map(it => qs[it.key]?.ai).filter(v => v != null));
+            return [
+              <tr key={`${s.secKey}__h`}>
+                <td colSpan={3} style={{ ...cell, background: `${s.color}0D` }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{s.label}</span>
+                  <span style={{ fontSize: 10, color: C.muted, marginLeft: 8 }}>
+                    섹션 평균{mAvg != null ? ` 내 ${mAvg}점` : ""}{mAvg != null && aAvg != null ? " ·" : ""}{aAvg != null ? ` AI ${aAvg}점` : ""}
+                  </span>
+                </td>
+              </tr>,
+              ...s.items.map(it => {
+                const e = qs[it.key] || {};
+                return (
+                  <tr key={it.key}>
+                    <td style={cell}>
+                      <div style={{ lineHeight: 1.5 }}>{it.text}{it.custom && <span style={{ fontSize: 9, fontWeight: 700, color: C.teal, background: `${C.teal}15`, border: `1px solid ${C.teal}35`, padding: "0px 5px", borderRadius: 7, marginLeft: 6, whiteSpace: "nowrap" }}>직접 추가</span>}</div>
+                      {e.note && <div style={{ fontSize: 11, color: C.sub, marginTop: 3 }}>✎ {e.note}</div>}
+                      {e.aiEvidence && <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>🤖 {e.aiEvidence}</div>}
+                    </td>
+                    <td style={{ ...cell, textAlign: "center", fontWeight: 700, color: e.manual != null ? C.accent : C.muted }}>{e.manual != null ? `${e.manual}점` : "—"}</td>
+                    <td style={{ ...cell, textAlign: "center", fontWeight: 700, color: e.ai != null ? C.purple : C.muted }}>{e.ai != null ? `${e.ai}점` : "—"}</td>
+                  </tr>
+                );
+              }),
+            ];
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── Interview Room ───────────────────────────────────────────────────────────
-function InterviewRoom({ candidate, position, onBack, onFinish }) {
+function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
   const rc = ROLE_COLORS[position?.colorIdx || 0];
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -711,17 +847,72 @@ function InterviewRoom({ candidate, position, onBack, onFinish }) {
   useEffect(() => { txRef.current = transcript; }, [transcript]);
   useEffect(() => { scoringRef.current = scoring; }, [scoring]);
 
+  // ─── 질문별 채점 상태 ──────────────────────────────────────────────────────
+  const qSections = buildQuestionSections(candidate);
+  const qList = qSections.flatMap(s => s.items.map(it => ({ key: it.key, text: it.text })));
+  const qListRef = useRef(qList);
+  useEffect(() => { qListRef.current = qList; });
+  const qScoresRef = useRef(candidate.questionScores || {});
+  useEffect(() => { qScoresRef.current = candidate.questionScores || {}; }, [candidate.questionScores]);
+  const [openQ, setOpenQ] = useState(null);
+  const [addQInputs, setAddQInputs] = useState({});
+
+  const patchQScores = (mut) => {
+    const next = { ...qScoresRef.current };
+    mut(next);
+    qScoresRef.current = next;
+    onUpdate && onUpdate({ questionScores: next });
+  };
+  const setManualScore = (key, val) => patchQScores(n => {
+    const prev = n[key] || { manual: null, ai: null, aiEvidence: null, note: "" };
+    n[key] = { ...prev, manual: val };
+  });
+  const setQNote = (key, note) => patchQScores(n => {
+    const prev = n[key] || { manual: null, ai: null, aiEvidence: null, note: "" };
+    n[key] = { ...prev, note };
+  });
+  const addCustomQ = (secKey) => {
+    const text = (addQInputs[secKey] || "").trim();
+    if (!text || !onUpdate) return;
+    const cq = { ...(candidate.customQuestions || {}) };
+    cq[secKey] = [...(cq[secKey] || []), { id: Date.now().toString(36), text }];
+    onUpdate({ customQuestions: cq });
+    setAddQInputs(p => ({ ...p, [secKey]: "" }));
+  };
+  const delCustomQ = (secKey, id) => {
+    if (!onUpdate || id == null) return;
+    const cq = { ...(candidate.customQuestions || {}) };
+    cq[secKey] = (cq[secKey] || []).filter(x => x.id !== id);
+    const next = { ...qScoresRef.current };
+    delete next[`${secKey}-c${id}`];
+    qScoresRef.current = next;
+    onUpdate({ customQuestions: cq, questionScores: next });
+  };
+
   const doScore = async (tx) => {
     if (!tx || tx.trim().split(" ").length < 15 || scoringRef.current) return;
     if (tx.length - lastScoredRef.current < 80) return;
     scoringRef.current = true;
     setScoring(true);
     try {
-      const r = await scoreInterview(position?.jd || "", candidate.name, tx, candidate.analysis?.interviewQuestions);
+      const r = await scoreInterview(position?.jd || "", candidate.name, tx, candidate.analysis?.interviewQuestions, qListRef.current);
       setLiveScore(r);
       setHistory(p => [...p.slice(-19), { score: r.liveScore }]);
       lastScoredRef.current = tx.length;
       setLastScoredLen(tx.length);
+      // 질문별 AI 점수 병합 (수동 점수는 절대 덮지 않음)
+      if (Array.isArray(r.questionScores) && r.questionScores.length && onUpdate) {
+        const valid = new Set(qListRef.current.map(q => q.key));
+        patchQScores(n => {
+          r.questionScores.forEach(s => {
+            if (!s || !valid.has(s.key)) return;
+            const sc5 = Math.round(Number(s.score));
+            if (!(sc5 >= 1 && sc5 <= 5)) return;
+            const prev = n[s.key] || { manual: null, ai: null, aiEvidence: null, note: "" };
+            n[s.key] = { ...prev, ai: sc5, aiEvidence: (s.evidence ? String(s.evidence).slice(0, 200) : prev.aiEvidence) || null };
+          });
+        });
+      }
     } catch (e) { console.error(e); }
     scoringRef.current = false;
     setScoring(false);
@@ -761,10 +952,6 @@ function InterviewRoom({ candidate, position, onBack, onFinish }) {
   const IS = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "9px 13px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
   const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 8, color: "#fff", padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" });
 
-  const iq = candidate.analysis?.interviewQuestions;
-  const questions = iq && typeof iq === "object" && !Array.isArray(iq) ? iq : null;
-  const legacyQ = Array.isArray(iq) ? iq : null;
-
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
@@ -798,33 +985,39 @@ function InterviewRoom({ candidate, position, onBack, onFinish }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 370px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {(questions || legacyQ) && (
-            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 12 }}>💬 면접 질문 20개</div>
-              {questions ? (<>
-                {[["🧡 인성/컬쳐핏", questions.culture||[], C.amber], ["💼 직무 역량", questions.skill||[], C.accent], ["🚀 미래/방향성", questions.future||[], C.purple], ["⚠️ 킬패스/단점", questions.killpath||[], C.red], ["💡 자기계발", questions.growth||[], C.green], ["📊 데이터 실전능력", questions.dataSkill||[], C.teal], ["⚡ 실행력", questions.execution||[], "#F97316"]].map(([label, qs, color]) => (
-                  <div key={label} style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 7, padding: "3px 8px", background: `${color}15`, borderRadius: 6, display: "inline-block" }}>{label}</div>
-                    {qs.map((q, i) => (
-                      <div key={i} style={{ display: "flex", gap: 9, padding: "9px 12px", background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, marginBottom: 6 }}>
-                        <span style={{ minWidth: 20, height: 20, borderRadius: 5, background: `${color}20`, color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, fontFamily: "'DM Mono',monospace" }}>Q</span>
-                        <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>{q}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </>) : legacyQ.map((q, i) => (
-                <div key={i} style={{ display: "flex", gap: 9, padding: "9px 12px", background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, marginBottom: 7 }}>
-                  <span style={{ minWidth: 20, height: 20, borderRadius: 5, background: C.glow, color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, fontFamily: "'DM Mono',monospace" }}>Q{i + 1}</span>
-                  <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>{q}</span>
-                </div>
-              ))}
-              {liveScore?.nextQuestion && <div style={{ marginTop: 9, padding: "9px 12px", background: "rgba(139,92,246,.08)", border: "1px solid rgba(139,92,246,.3)", borderRadius: 8 }}>
-                <span style={{ fontSize: 11, color: C.purple, fontWeight: 600 }}>✨ AI 추천 다음 질문</span>
-                <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{liveScore.nextQuestion}</div>
-              </div>}
+          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>💬 면접 질문 · 클릭해서 채점</span>
+              <span style={{ fontSize: 11, color: C.muted }}>총 {qList.length}개</span>
             </div>
-          )}
+            {qSections.map(sec => (
+              <div key={sec.secKey} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: sec.color, marginBottom: 7, padding: "3px 8px", background: `${sec.color}15`, borderRadius: 6, display: "inline-block" }}>{sec.label}</div>
+                {sec.items.map(it => (
+                  <QuestionRow key={it.key} item={it} color={sec.color}
+                    entry={(candidate.questionScores || {})[it.key]}
+                    open={openQ === it.key}
+                    onToggle={() => setOpenQ(p => p === it.key ? null : it.key)}
+                    onManual={v => setManualScore(it.key, v)}
+                    onNote={note => setQNote(it.key, note)}
+                    onDelete={() => delCustomQ(sec.secKey, it.id)} />
+                ))}
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  <input value={addQInputs[sec.secKey] || ""}
+                    onChange={e => { const v = e.target.value; setAddQInputs(p => ({ ...p, [sec.secKey]: v })); }}
+                    onKeyDown={e => e.key === "Enter" && addCustomQ(sec.secKey)}
+                    placeholder="+ 이 섹션에 질문 추가..."
+                    style={{ flex: 1, background: C.card, border: `1px dashed ${C.borderL}`, borderRadius: 7, color: C.text, padding: "7px 10px", fontSize: 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  <button onClick={() => addCustomQ(sec.secKey)}
+                    style={{ background: `${sec.color}15`, border: `1px solid ${sec.color}40`, borderRadius: 7, color: sec.color, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: (addQInputs[sec.secKey] || "").trim() ? 1 : .45 }}>추가</button>
+                </div>
+              </div>
+            ))}
+            {liveScore?.nextQuestion && <div style={{ marginTop: 9, padding: "9px 12px", background: "rgba(139,92,246,.08)", border: "1px solid rgba(139,92,246,.3)", borderRadius: 8 }}>
+              <span style={{ fontSize: 11, color: C.purple, fontWeight: 600 }}>✨ AI 추천 다음 질문</span>
+              <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>{liveScore.nextQuestion}</div>
+            </div>}
+          </div>
           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${recording ? "rgba(59,130,246,.35)" : C.border}`, padding: 18, flex: 1, transition: "border-color .3s" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -1065,6 +1258,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
                 </div>}
               </>) : <div style={{ textAlign: "center", padding: "26px 0", color: C.muted, fontSize: 13, lineHeight: 1.7 }}>면접 화면에서 <b style={{ color: C.sub }}>🏁 면접 종료</b>를 누르면<br />전체 녹취록 기반 AI 종합 피드백이 생성됩니다</div>}
           </div>
+          <QuestionScoreSummary candidate={candidate} />
           {a && <div style={Card}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 12 }}>📋 사전 이력서 분석</div>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -1654,6 +1848,8 @@ export default function HireL() {
           manualScores: c.manualScores || null,
           manualScoredBy: c.manualScoredBy || null,
           manualScoredAt: c.manualScoredAt || null,
+          questionScores: c.questionScores || null,
+          customQuestions: c.customQuestions || null,
           resume: (c.resume||"").slice(0, 300),
           files: [],
           analysis: c.analysis ? {
@@ -1912,6 +2108,7 @@ export default function HireL() {
           manualScores: c.manualScores || null,
           manualTotal: c.manualScores ? v2WeightedTotal(c.manualScores) : null,
           manualScoredBy: c.manualScoredBy || null,
+          questionScores: c.questionScores || null,
           analysisScore: v2 ? v2WeightedTotal(v2) : (c.analysis?.totalScore ?? null),
           aiVerdict: fb?.aiVerdict || c.analysis?.verdict || null,
           finalDecision: c.finalDecision?.result || null,
@@ -1960,7 +2157,7 @@ export default function HireL() {
             <span style={{ fontSize: 12, color: C.muted }}>면접 진행 중 · {interviewPosition?.name}</span>
           </div>
           <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 28px" }}>
-            <InterviewRoom candidate={interviewCandidate} position={interviewPosition} onBack={() => { setView("detail"); setSelectedCandidateId(interviewCandidateId); }} onFinish={(t) => finishInterview(interviewCandidate, interviewPosition, t)} />
+            <InterviewRoom candidate={interviewCandidate} position={interviewPosition} onBack={() => { setView("detail"); setSelectedCandidateId(interviewCandidateId); }} onFinish={(t) => finishInterview(interviewCandidate, interviewPosition, t)} onUpdate={(patch) => updateCandidate(interviewCandidate.id, patch)} />
           </div>
         </div>
       </>
@@ -2277,6 +2474,9 @@ export default function HireL() {
                         <button onClick={() => { setDecisionCandidateId(c.id); setView("decision"); }} style={{ marginLeft: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 12px", color: C.sub, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>합의·결정 화면 열기 →</button>
                       </div>
                       <DecisionSummary candidate={c} />
+                      <div style={{ marginTop: 10 }}>
+                        <QuestionScoreSummary candidate={c} />
+                      </div>
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 3, marginBottom: 20, background: C.card, padding: 3, borderRadius: 10, width: "fit-content", border: `1px solid ${C.border}` }}>
