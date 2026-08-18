@@ -2,6 +2,7 @@
 // API 키를 서버에서 안전하게 사용 + 모델 자동 폴백 (403/404 시 하위 모델로 재시도)
 
 export const config = {
+  maxDuration: 300, // 장문 분석(이력서+PDF)이 1~2분 걸릴 수 있어 함수 타임아웃 상향
   api: {
     bodyParser: {
       sizeLimit: '20mb', // PDF/이미지 업로드 허용
