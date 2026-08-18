@@ -26,6 +26,35 @@ const ROLE_COLORS = [
   { accent:"#0EA5E9", glow:"rgba(14,165,233,.15)" },
 ];
 
+// ─── 지원 채널 ────────────────────────────────────────────────────────────────
+const CHANNELS = ["사람인", "잡코리아", "그룹바이", "원티드", "직접지원", "기타"];
+const CHANNEL_COLORS = { 사람인: "#3B82F6", 잡코리아: "#4F46E5", 그룹바이: "#10B981", 원티드: "#0EA5E9", 직접지원: "#8B5CF6", 기타: "#94A3B8" };
+function ChannelBadge({ channel, small }) {
+  const ch = CHANNELS.includes(channel) ? channel : "기타";
+  const col = CHANNEL_COLORS[ch];
+  return <span style={{ display: "inline-block", fontSize: small ? 9 : 10, fontWeight: 700, color: col, background: `${col}18`, border: `1px solid ${col}40`, padding: small ? "1px 6px" : "2px 8px", borderRadius: 10, whiteSpace: "nowrap" }}>{ch}</span>;
+}
+
+// ─── 파이프라인 단계 (순서 고정, "탈락"은 맨 끝 별도 컬럼) ─────────────────────
+const STAGES = ["서류검토", "포트폴리오확인", "면접제의", "면접", "과제", "처우협의", "합격", "탈락"];
+const STAGE_COLORS = { 서류검토: "#94A3B8", 포트폴리오확인: "#8B5CF6", 면접제의: "#0EA5E9", 면접: "#3B82F6", 과제: "#F59E0B", 처우협의: "#EC4899", 합격: "#10B981", 탈락: "#64748B" };
+
+// ─── 큐라엘 v2 평가축 (마케터 전용, 각 0~5) ────────────────────────────────────
+const V2_AXES = [
+  ["content", "소재·콘텐츠 직접 제작력", 3],
+  ["perfLoop", "소재 성과 개선 감각", 2.5],
+  ["healthFood", "식품·건기식·심의 경험", 2],
+  ["multiChannel", "신규 채널 개척", 1.5],
+  ["croData", "상세페이지 CVR·데이터", 1.5],
+  ["tenure", "근속 안정성", 2],
+];
+// (content*3+perfLoop*2.5+healthFood*2+multiChannel*1.5+croData*1.5+tenure*2)/62.5*100, 반올림 1자리
+function v2WeightedTotal(v2) {
+  if (!v2) return null;
+  const sum = V2_AXES.reduce((acc, [key, , w]) => acc + (Number(v2[key]) || 0) * w, 0);
+  return Math.round((sum / 62.5) * 100 * 10) / 10;
+}
+
 // ─── Utils ────────────────────────────────────────────────────────────────────
 function fileToBase64(f){return new Promise((r,j)=>{const x=new FileReader();x.onload=()=>r(x.result.split(",")[1]);x.onerror=j;x.readAsDataURL(f)});}
 function fileToText(f){return new Promise((r,j)=>{const x=new FileReader();x.onload=()=>r(x.result);x.onerror=j;x.readAsText(f,"UTF-8")});}
@@ -69,7 +98,7 @@ async function callAI(body) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4000, ...body }),
+      body: JSON.stringify({ model: "claude-sonnet-5", max_tokens: 4000, ...body }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
@@ -113,7 +142,8 @@ const CURAEL_CULTURE = `
 - 대표가 현장에서 함께 일하는 플랫 구조
 `;
 
-async function analyzeResume(jd, candidate) {
+async function analyzeResume(jd, candidate, positionName) {
+  const isMarketer = (positionName || "").includes("마케터");
   const prompt = `당신은 큐라엘(CURAEL) 전담 HR 전문가 AI입니다. 아래 회사 정보와 채용 공고를 바탕으로 후보자 적합도를 정밀 평가하세요.
 
 ${CURAEL_CULTURE}
@@ -146,9 +176,18 @@ ${candidate.resume || ""}${candidate.files?.length ? "\n\n첨부 파일도 함�
 - totalScore는 6개 점수의 가중 평균으로 계산할 것
 - portfolioMatch: 건기식/헬스케어 특화 디자인 결과물(패키지·라벨·상세페이지) 실무 경험 점수
 - growthPotential: 1인 리드 포지션 적합성, 자기주도 학습·확장 역량 점수
-
+${isMarketer ? `
+【큐라엘 마케터 v2 평가축 — 반드시 포함】
+이 포지션은 마케터이므로 scores와는 별도로 "v2Scores" 객체를 응답 JSON에 반드시 추가하세요. 6개 축 모두 0~5 사이 숫자로 채울 것:
+- content: 소재·콘텐츠 직접 제작력
+- perfLoop: 메타·네이버·구글 소재 성과 개선 감각
+- healthFood: 식품·건기식·심의 경험
+- multiChannel: 신규 채널 개척
+- croData: 상세페이지 CVR·데이터
+- tenure: 근속 안정성
+` : ""}
 반드시 순수 JSON만 출력하세요. 설명이나 마크다운 없이 { 로 시작하는 JSON만 반환:
-{"totalScore":72,"scores":{"experienceMatch":65,"cultureFit":80,"skillKeywords":70,"stability":75,"portfolioMatch":60,"growthPotential":75},"verdict":"추천","strengths":["강점1","강점2","강점3"],"weaknesses":["약점1","약점2"],"keywords":[{"word":"키워드","type":"positive"}],"interviewQuestions":{"culture":["질문1","질문2","질문3"],"skill":["질문1","질문2","질문3","질문4","질문5"],"future":["질문1","질문2"],"killpath":["질문1","질문2","질문3"],"growth":["질문1","질문2"],"dataSkill":["질문1","질문2","질문3"],"execution":["질문1","질문2"]},"summary":"요약"}`;
+{"totalScore":72,"scores":{"experienceMatch":65,"cultureFit":80,"skillKeywords":70,"stability":75,"portfolioMatch":60,"growthPotential":75},"verdict":"추천","strengths":["강점1","강점2","강점3"],"weaknesses":["약점1","약점2"],"keywords":[{"word":"키워드","type":"positive"}],"interviewQuestions":{"culture":["질문1","질문2","질문3"],"skill":["질문1","질문2","질문3","질문4","질문5"],"future":["질문1","질문2"],"killpath":["질문1","질문2","질문3"],"growth":["질문1","질문2"],"dataSkill":["질문1","질문2","질문3"],"execution":["질문1","질문2"]},"summary":"요약"${isMarketer ? `,"v2Scores":{"content":3,"perfLoop":3,"healthFood":2,"multiChannel":3,"croData":3,"tenure":4}` : ""}}`;
 
   const rich = (candidate.files || []).filter(f => f.kind === "pdf" || f.kind === "image");
   const content = rich.length > 0
@@ -472,11 +511,29 @@ function exportRecruitmentReport(candidates, positions) {
     return `<tr>
       <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;font-weight:600;color:#111827">${esc(c.name)}</td>
       <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${esc(posName(c.positionId))}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;color:#6b7280">${esc(c.channel || "기타")}</td>
       <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:#374151">${a ? a.totalScore : "-"}</td>
       <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:#6b7280">${a ? esc(a.verdict) : "미분석"}</td>
       <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:center;font-weight:700;color:${dc(r)}">${r ? esc(r) : "미정"}</td>
     </tr>`;
   }).join("");
+
+  // 채널별 통계 (후보 수 · 면접 수 · 합격 수)
+  const channelStats = CHANNELS.map(ch => {
+    const list = candidates.filter(c => (c.channel || "기타") === ch);
+    return {
+      ch,
+      total: list.length,
+      interviewed: list.filter(c => c.interviewFeedback || c.finalDecision).length,
+      passed: list.filter(c => c.finalDecision?.result === "합격").length,
+    };
+  }).filter(s => s.total > 0);
+  const channelRows = channelStats.map(s => `<tr>
+      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;font-weight:600;color:${CHANNEL_COLORS[s.ch] || "#6b7280"}">${esc(s.ch)}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:#374151">${s.total}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:#2563eb">${s.interviewed}</td>
+      <td style="padding:9px 10px;border-bottom:1px solid #f0f0f0;text-align:center;color:#059669;font-weight:700">${s.passed}</td>
+    </tr>`).join("") || `<tr><td colspan="4" style="padding:9px 10px;color:#9ca3af">후보가 없습니다.</td></tr>`;
 
   const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>HireL 채용 종합 리포트</title>
   <style>body{font-family:'Malgun Gothic',sans-serif;color:#111827;margin:0;padding:36px;background:#fff}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:24px 0 12px}table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;padding:9px 10px;background:#f9fafb;border-bottom:2px solid #e5e7eb;color:#6b7280;font-size:12px}.kpi{display:flex;gap:10px;margin:16px 0}.kb{flex:1;border:1px solid #e5e7eb;border-radius:10px;padding:14px;text-align:center}.kn{font-size:24px;font-weight:800}.kl{font-size:11px;color:#6b7280;margin-top:3px}@media print{body{padding:18px}}</style>
@@ -491,10 +548,12 @@ function exportRecruitmentReport(candidates, positions) {
     <div class="kb"><div class="kn" style="color:#d97706">${hold.length}</div><div class="kl">보류</div></div>
     <div class="kb"><div class="kn" style="color:#dc2626">${rejected.length}</div><div class="kl">불합격</div></div>
   </div>
+  <h2>📊 채널별 통계</h2>
+  <table><thead><tr><th>채널</th><th style="text-align:center">후보 수</th><th style="text-align:center">면접 수</th><th style="text-align:center">합격 수</th></tr></thead><tbody>${channelRows}</tbody></table>
   <h2>✅ 최종 합격자 — 합격 사유</h2>
   ${passCards}
   <h2>전체 후보 현황</h2>
-  <table><thead><tr><th>이름</th><th>포지션</th><th style="text-align:center">이력서점수</th><th style="text-align:center">AI 사전판정</th><th style="text-align:center">최종결정</th></tr></thead><tbody>${rows}</tbody></table>
+  <table><thead><tr><th>이름</th><th>포지션</th><th>채널</th><th style="text-align:center">이력서점수</th><th style="text-align:center">AI 사전판정</th><th style="text-align:center">최종결정</th></tr></thead><tbody>${rows}</tbody></table>
   <script>window.onload=()=>window.print();</script>
   </body></html>`;
   const w = window.open("", "_blank");
@@ -1153,6 +1212,46 @@ function DecisionSummary({ candidate, compact }) {
   );
 }
 
+// ─── 포트폴리오 확인 체크리스트 (상세 화면 + 보드 "포트폴리오확인" 컬럼 공용) ────
+function PortfolioCheck({ candidate, onUpdate, compact }) {
+  const pc = candidate.portfolioCheck;
+  const [name, setName] = useState("");
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    const ev = getEvaluator();
+    setName((pc && pc.by) || ev.name || "");
+    setNote((pc && pc.note) || "");
+  }, [candidate.id]);
+  const IS2 = { width: "100%", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: compact ? "5px 8px" : "8px 11px", fontSize: compact ? 11 : 12, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+  if (pc?.checked) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: compact ? "6px 9px" : "10px 13px", background: "rgba(16,185,129,.08)", border: "1px solid rgba(16,185,129,.3)", borderRadius: 8 }}>
+        <span style={{ fontSize: compact ? 11 : 12, fontWeight: 700, color: C.green }}>✓ 포트폴리오 확인됨 ({pc.by || "확인자"} · {pc.at ? new Date(pc.at).toLocaleDateString("ko-KR") : ""})</span>
+        {!compact && pc.note && <span style={{ fontSize: 12, color: C.sub }}>· {pc.note}</span>}
+        <button onClick={() => onUpdate({ checked: false, by: pc.by || "", at: null, note: pc.note || "" })} style={{ marginLeft: "auto", background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: compact ? 10 : 11, fontFamily: "inherit" }}>해제</button>
+      </div>
+    );
+  }
+  const check = () => {
+    const by = (name || "").trim();
+    if (!by) { alert("확인자 이름을 입력하세요"); return; }
+    setEvaluatorName(by);
+    onUpdate({ checked: true, by, at: Date.now(), note: (note || "").trim() });
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: compact ? "7px 8px" : "12px 13px", background: C.surface, border: `1px dashed ${C.borderL}`, borderRadius: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        <input type="checkbox" checked={false} onChange={check} style={{ width: compact ? 13 : 15, height: compact ? 13 : 15, accentColor: C.purple, cursor: "pointer", margin: 0 }} />
+        <span style={{ fontSize: compact ? 11 : 13, fontWeight: 600, color: C.sub }}>포트폴리오 확인</span>
+      </div>
+      <div style={{ display: "flex", gap: 5, flexDirection: compact ? "column" : "row" }}>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="확인자 이름" style={{ ...IS2, flex: compact ? undefined : "0 0 130px" }} />
+        <input value={note} onChange={e => setNote(e.target.value)} placeholder="메모 (선택)" style={{ ...IS2, flex: 1 }} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Candidate Card ───────────────────────────────────────────────────────────
 function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onReanalyze, onExportPDF, onDecision, position }) {
   const busy = analyzingIds.has(c.id);
@@ -1166,7 +1265,10 @@ function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onR
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <div style={{ width: 40, height: 40, borderRadius: 10, background: `${rc.accent}25`, border: `1px solid ${rc.accent}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: rc.accent }}>{c.name[0]}</div>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</span>
+            <ChannelBadge channel={c.channel} small />
+          </div>
           <div style={{ fontSize: 11, color: C.sub }}>{c.age ? `${c.age}세` : ""}{c.fileNames?.length > 0 && <span style={{ marginLeft: 5 }}>📎{c.fileNames.length}</span>}</div>
         </div>
         {(c.finalDecision || c.interviewFeedback || (!busy && a)) && <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
@@ -1188,6 +1290,7 @@ function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onR
         <Bar label="포트폴리오" score={a.scores.portfolioMatch} revised={c.interviewFeedback?.revisedScores?.portfolioMatch} />
         <Bar label="성장 가능성" score={a.scores.growthPotential} revised={c.interviewFeedback?.revisedScores?.growthPotential} />
         <div style={{ marginTop: 11, padding: "9px 11px", background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, color: C.sub, lineHeight: 1.6 }}>{a.summary}</div>
+        {c.portfolioCheck?.checked && <div style={{ marginTop: 8, fontSize: 11, fontWeight: 600, color: C.green }}>✓ 포트폴리오 확인됨 ({c.portfolioCheck.by || "확인자"} · {c.portfolioCheck.at ? new Date(c.portfolioCheck.at).toLocaleDateString("ko-KR") : ""})</div>}
         <DecisionSummary candidate={c} compact />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 11 }}>
           <button onClick={e => { e.stopPropagation(); onInterview(); }} style={{ padding: "8px", borderRadius: 8, border: "none", background: `linear-gradient(135deg,${C.purple},${C.pink})`, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>🎤 면접 시작</button>
@@ -1210,8 +1313,8 @@ const SAMPLE_POSITIONS = [
   { id: "p2", name: "마케터", colorIdx: 1, jd: "직무명: 디지털 마케터 (큐라엘 브랜드팀)\n\n주요 업무:\n- 큐라엘몰 및 SNS 채널 운영\n- 암환자 대상 콘텐츠 기획\n- GEO/SEO 최적화\n\n자격 요건:\n- SNS 채널 운영 경험 2년 이상\n- 헬스케어 콘텐츠 경험 우대\n\n우리 문화:\n환자 중심, 빠른 실행, 창의적 실험" },
 ];
 const SAMPLE_CANDIDATES = [
-  { id: "c1", positionId: "p1", name: "박서준", age: 30, resume: "컴퓨터공학 석사 (KAIST, 2020)\n현) 네이버 헬스케어 데이터팀 4년\nPython, TensorFlow, SQL 고급\n의료 EMR 데이터 분석 프로젝트 3건", files: [], fileNames: [] },
-  { id: "c2", positionId: "p2", name: "김민지", age: 29, resume: "경영학 학사 (이화여대, 2018)\n현) 비타민하우스 디지털마케팅팀 3년\n인스타그램/유튜브 채널 팔로워 12만\nGoogle Ads ROAS 350% 달성", files: [], fileNames: [] },
+  { id: "c1", positionId: "p1", name: "박서준", age: 30, channel: "직접지원", stage: "서류검토", resume: "컴퓨터공학 석사 (KAIST, 2020)\n현) 네이버 헬스케어 데이터팀 4년\nPython, TensorFlow, SQL 고급\n의료 EMR 데이터 분석 프로젝트 3건", files: [], fileNames: [] },
+  { id: "c2", positionId: "p2", name: "김민지", age: 29, channel: "사람인", stage: "서류검토", resume: "경영학 학사 (이화여대, 2018)\n현) 비타민하우스 디지털마케팅팀 3년\n인스타그램/유튜브 채널 팔로워 12만\nGoogle Ads ROAS 350% 달성", files: [], fileNames: [] },
 ];
 
 export default function HireL() {
@@ -1219,6 +1322,7 @@ export default function HireL() {
   const [positions, setPositions] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [selectedPositionId, setSelectedPositionId] = useState("all");
+  const [selectedChannel, setSelectedChannel] = useState("all");
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
   const [interviewCandidateId, setInterviewCandidateId] = useState(null);
   const [decisionCandidateId, setDecisionCandidateId] = useState(null);
@@ -1228,7 +1332,7 @@ export default function HireL() {
   const [showPositionModal, setShowPositionModal] = useState(false);
   const [editingPosition, setEditingPosition] = useState(null);
   const [showAddCandidate, setShowAddCandidate] = useState(false);
-  const [addForm, setAddForm] = useState({ name: "", age: "", resume: "", positionId: "", inputMode: "file" });
+  const [addForm, setAddForm] = useState({ name: "", age: "", resume: "", positionId: "", inputMode: "file", channel: "기타" });
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [toast, setToast] = useState(null);
 
@@ -1281,12 +1385,16 @@ export default function HireL() {
         positions: data.positions.map(p => ({ id: p.id, name: p.name, colorIdx: p.colorIdx, jd: (p.jd||"") })),
         candidates: data.candidates.map(c => ({
           id: c.id, positionId: c.positionId, name: c.name, age: c.age,
+          channel: c.channel || "기타",
+          stage: c.stage || "서류검토",
+          portfolioCheck: c.portfolioCheck || null,
           fileNames: c.fileNames || [],
           resume: (c.resume||"").slice(0, 300),
           files: [],
           analysis: c.analysis ? {
             totalScore: c.analysis.totalScore,
             scores: c.analysis.scores,
+            v2Scores: c.analysis.v2Scores || null,
             verdict: c.analysis.verdict,
             summary: c.analysis.summary,
             strengths: c.analysis.strengths,
@@ -1398,14 +1506,28 @@ export default function HireL() {
       setGenFeedbackFor(null);
     }
   };
-  const saveFinalDecision = (id, final) => { updateCandidate(id, { finalDecision: final }); showToast(`최종 결정 저장 — ${final.result}`); };
+  const saveFinalDecision = (id, final) => {
+    // 최종 결정에 따라 파이프라인 stage 자동 동기화 (합격 → "합격", 불합격 → "탈락")
+    const patch = { finalDecision: final };
+    if (final.result === "합격") patch.stage = "합격";
+    else if (final.result === "불합격") patch.stage = "탈락";
+    updateCandidate(id, patch);
+    showToast(`최종 결정 저장 — ${final.result}`);
+  };
+
+  // 칸반 보드: ◀ ▶ 버튼으로 단계 이동
+  const moveStage = (c, dir) => {
+    const idx = STAGES.indexOf(c.stage || "서류검토");
+    const ni = Math.min(STAGES.length - 1, Math.max(0, idx + dir));
+    if (ni !== idx) updateCandidate(c.id, { stage: STAGES[ni] });
+  };
 
   const doAnalyzeAndSync = async (c) => {
     const pos = positions.find(p => p.id === c.positionId);
     if (!pos) { showToast("포지션을 찾을 수 없습니다", "error"); return; }
     setAnalyzingIds(p => new Set(p).add(c.id));
     try {
-      const r = await analyzeResume(pos.jd, c);
+      const r = await analyzeResume(pos.jd, c, pos.name);
       setCandidates(prev => {
         const updated = prev.map(x => x.id === c.id ? { ...x, analysis: r } : x);
         // ✅ 분석 완료 직후 최신 state로 즉시 Firebase push (throttle 우회)
@@ -1434,9 +1556,9 @@ export default function HireL() {
     let resume = addForm.resume;
     const tf = uploadedFiles.filter(f => f.kind === "text");
     if (tf.length) resume = [resume, ...tf.map(f => f.text)].filter(Boolean).join("\n\n");
-    const c = { id: `c${Date.now()}`, positionId: addForm.positionId, name: addForm.name, age: parseInt(addForm.age) || null, resume, files: uploadedFiles.filter(f => f.kind === "pdf" || f.kind === "image"), fileNames: uploadedFiles.map(f => f.name) };
+    const c = { id: `c${Date.now()}`, positionId: addForm.positionId, name: addForm.name, age: parseInt(addForm.age) || null, channel: addForm.channel || "기타", stage: "서류검토", resume, files: uploadedFiles.filter(f => f.kind === "pdf" || f.kind === "image"), fileNames: uploadedFiles.map(f => f.name) };
     setCandidates(p => [...p, c]);
-    setAddForm({ name: "", age: "", resume: "", positionId: "", inputMode: "file" });
+    setAddForm({ name: "", age: "", resume: "", positionId: "", inputMode: "file", channel: "기타" });
     setUploadedFiles([]); setShowAddCandidate(false);
     showToast(`${c.name} 후보자 등록 완료 — AI 분석 시작`);
     doAnalyzeAndSync(c);
@@ -1468,11 +1590,46 @@ export default function HireL() {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      try { const d = JSON.parse(ev.target.result); setPositions(d.positions || []); setCandidates(d.candidates || []); showToast("데이터 불러오기 완료"); }
+      try {
+        const d = JSON.parse(ev.target.result);
+        setPositions(d.positions || []);
+        // channel/stage/portfolioCheck 등 모든 필드를 스프레드로 보존, 없으면 기본값만 채움
+        setCandidates((d.candidates || []).map(c => ({ channel: "기타", stage: "서류검토", ...c })));
+        showToast("데이터 불러오기 완료");
+      }
       catch { showToast("파일 형식이 올바르지 않습니다", "error"); }
     };
     reader.readAsText(file);
     e.target.value = "";
+  };
+
+  // ─── 대장 양방향 연동: 전체 후보를 채용관리대장 회신용 JSON으로 내보내기 ────────
+  const exportLedger = () => {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      candidates: candidates.map(c => {
+        const pos = positions.find(p => p.id === c.positionId);
+        const v2 = c.analysis?.v2Scores;
+        const fb = c.interviewFeedback;
+        return {
+          name: c.name,
+          positionName: pos?.name || "미지정",
+          channel: c.channel || "기타",
+          stage: c.stage || "서류검토",
+          portfolioCheck: c.portfolioCheck || null,
+          analysisScore: v2 ? v2WeightedTotal(v2) : (c.analysis?.totalScore ?? null),
+          aiVerdict: fb?.aiVerdict || c.analysis?.verdict || null,
+          finalDecision: c.finalDecision?.result || null,
+          interviewFeedbackSummary: fb?.summary || fb?.oneliner || null,
+        };
+      }),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `hirel_대장회신_${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    URL.revokeObjectURL(url);
+    showToast("대장 회신 JSON 저장 완료");
   };
 
   const exportAllPDF = (posId) => {
@@ -1488,8 +1645,10 @@ export default function HireL() {
   const interviewPosition = positions.find(p => p.id === interviewCandidate?.positionId);
   const decisionCandidate = candidates.find(c => c.id === decisionCandidateId);
   const decisionPosition = positions.find(p => p.id === decisionCandidate?.positionId);
-  const filteredCandidates = selectedPositionId === "all" ? candidates : candidates.filter(c => c.positionId === selectedPositionId);
-  const grouped = positions.map(pos => ({ pos, cands: [...candidates.filter(c => c.positionId === pos.id)].sort((a, b) => (b.analysis?.totalScore || 0) - (a.analysis?.totalScore || 0)) })).filter(g => g.cands.length > 0);
+  // 채널 필터 (포지션 필터와 AND 조합 — 대시보드/보드 공통)
+  const channelFiltered = selectedChannel === "all" ? candidates : candidates.filter(c => (c.channel || "기타") === selectedChannel);
+  const filteredCandidates = selectedPositionId === "all" ? channelFiltered : channelFiltered.filter(c => c.positionId === selectedPositionId);
+  const grouped = positions.map(pos => ({ pos, cands: [...channelFiltered.filter(c => c.positionId === pos.id)].sort((a, b) => (b.analysis?.totalScore || 0) - (a.analysis?.totalScore || 0)) })).filter(g => g.cands.length > 0);
 
   const importRef = useRef();
 
@@ -1556,11 +1715,14 @@ export default function HireL() {
             <span style={{ fontSize: 10, color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: "2px 7px", borderRadius: 18 }}>BETA</span>
           </div>
           <div style={{ display: "flex", gap: 3 }}>
-            {[["dashboard", "◫ 대시보드"], ["detail", "◉ 상세 분석"], ["report", "📊 채용 리포트"]].map(([v, l]) => (
+            {[["dashboard", "◫ 대시보드"], ["board", "▦ 보드"], ["detail", "◉ 상세 분석"], ["report", "📊 채용 리포트"]].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)} style={{ padding: "5px 14px", borderRadius: 7, border: "none", fontSize: 13, fontWeight: 500, background: view === v ? C.glow : "transparent", color: view === v ? C.accent : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{l}</button>
             ))}
           </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <button onClick={exportLedger} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              📊 대장 내보내기
+            </button>
             <button onClick={exportJSON} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
               📤 팀 공유
             </button>
@@ -1621,11 +1783,87 @@ export default function HireL() {
             );
           })}
         </div>
+        {(view === "dashboard" || view === "board") && (
+          <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", alignItems: "center", gap: 6, padding: "8px 0 10px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: C.muted, marginRight: 2 }}>채널</span>
+            <button onClick={() => setSelectedChannel("all")} style={{ padding: "3px 11px", borderRadius: 14, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: selectedChannel === "all" ? C.glow : "transparent", border: `1px solid ${selectedChannel === "all" ? C.accent : C.border}`, color: selectedChannel === "all" ? C.accent : C.sub }}>
+              전체 <span style={{ fontFamily: "'DM Mono',monospace" }}>{candidates.length}</span>
+            </button>
+            {CHANNELS.map(ch => {
+              const col = CHANNEL_COLORS[ch];
+              const cnt = candidates.filter(c => (c.channel || "기타") === ch).length;
+              const on = selectedChannel === ch;
+              return (
+                <button key={ch} onClick={() => setSelectedChannel(on ? "all" : ch)} style={{ padding: "3px 11px", borderRadius: 14, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: on ? `${col}20` : "transparent", border: `1px solid ${on ? col : C.border}`, color: on ? col : C.sub }}>
+                  {ch} <span style={{ fontFamily: "'DM Mono',monospace", color: on ? col : C.muted }}>{cnt}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 28px" }}>
         {view === "report" && (
           <ReportView candidates={candidates} positions={positions} onExport={() => exportRecruitmentReport(candidates, positions)} />
+        )}
+        {view === "board" && (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>파이프라인 보드</h2>
+                <span style={{ fontSize: 12, color: C.sub }}>총 {filteredCandidates.length}명 · ◀ ▶ 버튼으로 단계를 이동하세요</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", overflowX: "auto", paddingBottom: 16 }}>
+              {STAGES.map(stage => {
+                const col = STAGE_COLORS[stage] || C.sub;
+                const isFail = stage === "탈락";
+                const cands = filteredCandidates.filter(c => (c.stage || "서류검토") === stage);
+                return (
+                  <div key={stage} style={{ width: 232, minWidth: 232, flexShrink: 0, background: isFail ? "rgba(100,116,139,.08)" : C.surface, borderRadius: 12, border: `1px solid ${isFail ? C.border : `${col}35`}`, padding: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, padding: "2px 4px" }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: col }} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: isFail ? C.muted : C.text }}>{stage}</span>
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: C.muted, fontFamily: "'DM Mono',monospace" }}>{cands.length}</span>
+                    </div>
+                    {cands.length === 0 && <div style={{ fontSize: 11, color: C.muted, textAlign: "center", padding: "14px 0" }}>비어 있음</div>}
+                    {cands.map(c => {
+                      const pos = positions.find(p => p.id === c.positionId);
+                      const rc = ROLE_COLORS[pos?.colorIdx || 0];
+                      const idx = STAGES.indexOf(c.stage || "서류검토");
+                      const arrowBtn = (disabled) => ({ flex: 1, padding: "4px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface, color: disabled ? C.muted : C.sub, cursor: disabled ? "default" : "pointer", fontSize: 11, fontFamily: "inherit", opacity: disabled ? .35 : 1 });
+                      return (
+                        <div key={c.id} style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, padding: "10px 11px", marginBottom: 8, cursor: "pointer" }}
+                          onClick={() => { setSelectedCandidateId(c.id); setActiveTab("overview"); setView("detail"); }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700 }}>{c.name}</span>
+                            {c.analysis && <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: sc(c.analysis.totalScore), fontFamily: "'DM Mono',monospace" }}>{c.analysis.totalScore}</span>}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
+                            <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 10, background: `${rc.accent}20`, border: `1px solid ${rc.accent}40`, color: rc.accent, fontWeight: 600 }}>{pos?.name || "미지정"}</span>
+                            <ChannelBadge channel={c.channel} small />
+                          </div>
+                          {c.portfolioCheck?.checked && (
+                            <div style={{ fontSize: 10, fontWeight: 600, color: C.green, marginBottom: 6 }}>✓ 포트폴리오 확인됨 ({c.portfolioCheck.by || "확인자"} · {c.portfolioCheck.at ? new Date(c.portfolioCheck.at).toLocaleDateString("ko-KR") : ""})</div>
+                          )}
+                          {stage === "포트폴리오확인" && !c.portfolioCheck?.checked && (
+                            <div onClick={e => e.stopPropagation()} style={{ marginBottom: 7 }}>
+                              <PortfolioCheck candidate={c} compact onUpdate={pc => updateCandidate(c.id, { portfolioCheck: pc })} />
+                            </div>
+                          )}
+                          <div onClick={e => e.stopPropagation()} style={{ display: "flex", gap: 5 }}>
+                            <button disabled={idx <= 0} onClick={() => moveStage(c, -1)} style={arrowBtn(idx <= 0)} title="이전 단계">◀</button>
+                            <button disabled={idx >= STAGES.length - 1} onClick={() => moveStage(c, 1)} style={arrowBtn(idx >= STAGES.length - 1)} title="다음 단계">▶</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
         {view === "dashboard" && (
           <div>
@@ -1691,6 +1929,8 @@ export default function HireL() {
                       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                         <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>{c.name}</h2>
                         <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 14, background: `${rc.accent}20`, border: `1px solid ${rc.accent}40`, color: rc.accent, fontWeight: 600 }}>{pos?.name}</span>
+                        <ChannelBadge channel={c.channel} />
+                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 12, background: `${STAGE_COLORS[c.stage || "서류검토"]}18`, border: `1px solid ${STAGE_COLORS[c.stage || "서류검토"]}40`, color: STAGE_COLORS[c.stage || "서류검토"], fontWeight: 600 }}>{c.stage || "서류검토"}</span>
                       </div>
                       <div style={{ fontSize: 12, color: C.sub }}>{c.age ? `${c.age}세` : ""}{c.fileNames?.length > 0 && <span style={{ marginLeft: 8 }}>📎{c.fileNames.join(", ")}</span>}</div>
                     </div>
@@ -1706,6 +1946,10 @@ export default function HireL() {
                         <button onClick={() => doAnalyze(c)} style={{ ...BP(), padding: "8px 14px", fontSize: 13 }}>재분석</button>
                       </div>
                     )}
+                  </div>
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>📁 포트폴리오 확인</div>
+                    <PortfolioCheck candidate={c} onUpdate={pc => updateCandidate(c.id, { portfolioCheck: pc })} />
                   </div>
                   {a && !busy && (
                     <div style={{ marginBottom: 18 }}>
@@ -1747,6 +1991,34 @@ export default function HireL() {
                             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 9 }}>✦ AI 요약</h3>
                             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, margin: 0 }}>{a.summary}</p>
                           </div>
+                          {a.v2Scores && (
+                            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                                <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>🎯 큐라엘 v2 축</h3>
+                                <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, color: sc(v2WeightedTotal(a.v2Scores)), fontFamily: "'DM Mono',monospace" }}>{v2WeightedTotal(a.v2Scores)}점</span>
+                                <span style={{ fontSize: 10, color: C.muted }}>가중 총점</span>
+                              </div>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                <tbody>
+                                  {V2_AXES.map(([key, label, w]) => {
+                                    const v = Number(a.v2Scores[key]) || 0;
+                                    return (
+                                      <tr key={key}>
+                                        <td style={{ padding: "5px 4px", color: C.sub, borderBottom: `1px solid ${C.border}` }}>{label}</td>
+                                        <td style={{ padding: "5px 4px", textAlign: "right", color: C.muted, fontSize: 10, borderBottom: `1px solid ${C.border}` }}>x{w}</td>
+                                        <td style={{ padding: "5px 4px", width: 90, borderBottom: `1px solid ${C.border}` }}>
+                                          <div style={{ height: 5, background: C.border, borderRadius: 3, overflow: "hidden" }}>
+                                            <div style={{ height: "100%", width: `${(v / 5) * 100}%`, background: C.purple, borderRadius: 3 }} />
+                                          </div>
+                                        </td>
+                                        <td style={{ padding: "5px 4px", textAlign: "right", fontWeight: 700, color: C.text, fontFamily: "'DM Mono',monospace", borderBottom: `1px solid ${C.border}`, width: 38 }}>{v}/5</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
                             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 9 }}>강점</h3>
                             {a.strengths?.map((s, i) => <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}><span style={{ color: C.green }}>✓</span><span style={{ fontSize: 13, color: C.sub }}>{s}</span></div>)}
@@ -1869,6 +2141,12 @@ export default function HireL() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11, marginBottom: 16 }}>
               <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>이름 *</label><input value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} placeholder="홍길동" style={IS} /></div>
               <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>나이</label><input value={addForm.age} onChange={e => setAddForm(p => ({ ...p, age: e.target.value }))} placeholder="30" type="number" style={IS} /></div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>지원 채널</label>
+              <select value={addForm.channel || "기타"} onChange={e => setAddForm(p => ({ ...p, channel: e.target.value }))} style={{ ...IS, cursor: "pointer" }}>
+                {CHANNELS.map(ch => <option key={ch} value={ch}>{ch}</option>)}
+              </select>
             </div>
             <div style={{ display: "flex", background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}`, marginBottom: 13 }}>
               {[["file", "📎 파일 업로드"], ["text", "✏️ 텍스트 입력"]].map(([m, l]) => (
