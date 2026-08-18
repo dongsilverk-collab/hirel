@@ -223,8 +223,7 @@ ${transcript}
 추가로: 녹취록에서 특정 질문에 대한 후보자의 답변이 실제로 확인되는 경우에만, 그 질문의 key 그대로 1~5점과 근거 한 줄을 "questionScores" 배열에 담으세요. 답변이 확인되지 않은 질문은 배열에서 제외하세요. 확인된 질문이 없으면 빈 배열 []로 두세요.
 순수 JSON으로만:
 {"liveScore":숫자(0-100),"dimensions":{"communication":숫자,"expertise":숫자,"motivation":숫자,"problemSolving":숫자,"culture":숫자},"highlights":["인상적인 발언 요약1","인상적인 발언 요약2"],"concerns":["우려 포인트1"],"nextQuestion":"지금 상황에서 가장 적절한 다음 질문","oneliner":"현재까지 한줄 평가","questionScores":[{"key":"skill-0","score":4,"evidence":"근거 한 줄"}]}`;
-  // 실시간 평가는 속도가 중요 — 빠른 모델(Haiku) 사용 (심층 이력서 분석은 sonnet-5 유지)
-  const data = await callAI({ model: "claude-haiku-4-5-20251001", messages: [{ role: "user", content: prompt }] });
+  const data = await callAI({ messages: [{ role: "user", content: prompt }] });
   const raw2 = data.content.map(b => b.text || "").join("");
   const m2 = raw2.match(/\{[\s\S]*\}/);
   if (!m2) throw new Error("JSON 없음");
