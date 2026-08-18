@@ -2106,6 +2106,14 @@ export default function HireL() {
                           <div onClick={e => e.stopPropagation()} style={{ display: "flex", gap: 5 }}>
                             <button disabled={idx <= 0} onClick={() => moveStage(c, -1)} style={arrowBtn(idx <= 0)} title="이전 단계">◀</button>
                             <button disabled={idx >= STAGES.length - 1} onClick={() => moveStage(c, 1)} style={arrowBtn(idx >= STAGES.length - 1)} title="다음 단계">▶</button>
+                            {!isFail && (
+                              <button onClick={() => { updateCandidate(c.id, { stage: "탈락" }); showToast(`${c.name} — 탈락 처리됨`); }}
+                                style={{ ...arrowBtn(false), flex: "0 0 auto", padding: "4px 9px", color: C.red, borderColor: `${C.red}50` }} title="바로 불합격 (탈락으로 이동)">불합격</button>
+                            )}
+                            {isFail && (
+                              <button onClick={() => { updateCandidate(c.id, { stage: "서류검토" }); showToast(`${c.name} — 서류검토로 복구`); }}
+                                style={{ ...arrowBtn(false), flex: "0 0 auto", padding: "4px 9px", color: C.teal, borderColor: `${C.teal}50` }} title="탈락 취소 (서류검토로 복구)">복구</button>
+                            )}
                           </div>
                         </div>
                       );
