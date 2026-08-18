@@ -10,25 +10,25 @@ if (typeof window !== "undefined") {
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const C = {
-  bg:"#070B12", surface:"#0C1220", card:"#101828",
-  border:"#1a2d45", borderL:"#213550",
-  accent:"#3B82F6", glow:"rgba(59,130,246,0.13)",
-  teal:"#0EA5E9", green:"#10B981", amber:"#F59E0B", red:"#EF4444",
-  purple:"#8B5CF6", pink:"#EC4899",
-  text:"#F1F5F9", sub:"#94A3B8", muted:"#3d5470",
+  bg:"#F7F8FA", surface:"#F9FAFB", card:"#FFFFFF",
+  border:"#E5E7EB", borderL:"#D1D5DB",
+  accent:"#2563EB", glow:"rgba(37,99,235,0.08)",
+  teal:"#0284C7", green:"#059669", amber:"#D97706", red:"#DC2626",
+  purple:"#7C3AED", pink:"#DB2777",
+  text:"#111827", sub:"#6B7280", muted:"#9CA3AF",
 };
 const ROLE_COLORS = [
-  { accent:"#3B82F6", glow:"rgba(59,130,246,.15)" },
-  { accent:"#10B981", glow:"rgba(16,185,129,.15)" },
-  { accent:"#8B5CF6", glow:"rgba(139,92,246,.15)" },
-  { accent:"#F59E0B", glow:"rgba(245,158,11,.15)" },
-  { accent:"#EC4899", glow:"rgba(236,72,153,.15)" },
-  { accent:"#0EA5E9", glow:"rgba(14,165,233,.15)" },
+  { accent:"#2563EB", glow:"rgba(37,99,235,.10)" },
+  { accent:"#059669", glow:"rgba(5,150,105,.10)" },
+  { accent:"#7C3AED", glow:"rgba(124,58,237,.10)" },
+  { accent:"#D97706", glow:"rgba(217,119,6,.10)" },
+  { accent:"#DB2777", glow:"rgba(219,39,119,.10)" },
+  { accent:"#0284C7", glow:"rgba(2,132,199,.10)" },
 ];
 
 // ─── 지원 채널 ────────────────────────────────────────────────────────────────
 const CHANNELS = ["사람인", "잡코리아", "그룹바이", "원티드", "직접지원", "기타"];
-const CHANNEL_COLORS = { 사람인: "#3B82F6", 잡코리아: "#4F46E5", 그룹바이: "#10B981", 원티드: "#0EA5E9", 직접지원: "#8B5CF6", 기타: "#94A3B8" };
+const CHANNEL_COLORS = { 사람인: "#2563EB", 잡코리아: "#4F46E5", 그룹바이: "#059669", 원티드: "#0284C7", 직접지원: "#7C3AED", 기타: "#6B7280" };
 function ChannelBadge({ channel, small }) {
   const ch = CHANNELS.includes(channel) ? channel : "기타";
   const col = CHANNEL_COLORS[ch];
@@ -37,7 +37,7 @@ function ChannelBadge({ channel, small }) {
 
 // ─── 파이프라인 단계 (순서 고정, "탈락"은 맨 끝 별도 컬럼) ─────────────────────
 const STAGES = ["서류검토", "포트폴리오확인", "면접제의", "면접", "과제", "처우협의", "합격", "탈락"];
-const STAGE_COLORS = { 서류검토: "#94A3B8", 포트폴리오확인: "#8B5CF6", 면접제의: "#0EA5E9", 면접: "#3B82F6", 과제: "#F59E0B", 처우협의: "#EC4899", 합격: "#10B981", 탈락: "#64748B" };
+const STAGE_COLORS = { 서류검토: "#6B7280", 포트폴리오확인: "#7C3AED", 면접제의: "#0284C7", 면접: "#2563EB", 과제: "#D97706", 처우협의: "#DB2777", 합격: "#059669", 탈락: "#64748B" };
 
 // ─── 큐라엘 v2 평가축 (마케터 전용, 각 0~5) ────────────────────────────────────
 const V2_AXES = [
@@ -90,7 +90,7 @@ function fileIcon(t=""){return t.includes("pdf")?"📄":t.includes("word")||t.in
 function fmtSize(b){return b<1024?b+" B":b<1048576?(b/1024).toFixed(1)+" KB":(b/1048576).toFixed(1)+" MB";}
 function fmtTime(s){return`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;}
 const sc=(s)=>s>=75?C.green:s>=50?C.accent:s>=30?C.amber:C.red;
-const scHex=(s)=>s>=75?"#10B981":s>=50?"#3B82F6":s>=30?"#F59E0B":"#EF4444";
+const scHex=(s)=>s>=75?"#059669":s>=50?"#2563EB":s>=30?"#D97706":"#DC2626";
 
 // ─── AI call (via /api/chat proxy) ───────────────────────────────────────────
 async function callAI(body) {
@@ -283,9 +283,9 @@ function tallyDecisions(evals) {
   return { tally: t, total, result };
 }
 const DEC_STYLE = {
-  합격: { c: "#10B981", bg: "rgba(16,185,129,.12)", b: "rgba(16,185,129,.35)" },
-  보류: { c: "#F59E0B", bg: "rgba(245,158,11,.12)", b: "rgba(245,158,11,.35)" },
-  불합격: { c: "#EF4444", bg: "rgba(239,68,68,.12)", b: "rgba(239,68,68,.35)" },
+  합격: { c: "#047857", bg: "rgba(16,185,129,.10)", b: "rgba(16,185,129,.35)" },
+  보류: { c: "#B45309", bg: "rgba(245,158,11,.10)", b: "rgba(245,158,11,.35)" },
+  불합격: { c: "#B91C1C", bg: "rgba(239,68,68,.10)", b: "rgba(239,68,68,.35)" },
 };
 // 사람 표 우선 결정: 사람 다수가 명확하면 그대로(AI는 참고), 사람이 동점/0명일 때만 AI가 타이브레이크
 function decideResult(humanEvals, aiVote) {
@@ -570,7 +570,7 @@ function Ring({ score, size = 80, stroke = 7, color = C.accent, label }) {
           <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={C.border} strokeWidth={stroke} />
           <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
             strokeDasharray={`${d} ${ci}`} strokeLinecap="round"
-            style={{ transition: "stroke-dasharray 1s ease", filter: `drop-shadow(0 0 5px ${color})` }} />
+            style={{ transition: "stroke-dasharray 1s ease" }} />
         </svg>
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <span style={{ fontSize: size * .22, fontWeight: 700, color: C.text, fontFamily: "'DM Mono',monospace" }}>{score}</span>
@@ -586,7 +586,7 @@ function Bar({ label, score, revised }) {
   const base = score, rev = has ? revised : score;
   const baseC = sc(base), revC = sc(rev);
   const up = has && rev > base, down = has && rev < base;
-  const boost = "#8B5CF6";
+  const boost = "#7C3AED";
   const delta = rev - base;
   return (
     <div style={{ marginBottom: 12 }}>
@@ -600,12 +600,12 @@ function Bar({ label, score, revised }) {
       <div style={{ height: 5, background: C.border, borderRadius: 3, overflow: "hidden", display: "flex" }}>
         {up ? (<>
           <div style={{ height: "100%", width: `${base}%`, background: baseC, transition: "width 1.2s ease" }} />
-          <div style={{ height: "100%", width: `${rev - base}%`, background: boost, boxShadow: `0 0 7px ${boost}80`, transition: "width 1.2s ease" }} />
+          <div style={{ height: "100%", width: `${rev - base}%`, background: boost, transition: "width 1.2s ease" }} />
         </>) : down ? (<>
           <div style={{ height: "100%", width: `${rev}%`, background: revC, transition: "width 1.2s ease" }} />
           <div style={{ height: "100%", width: `${base - rev}%`, background: "rgba(239,68,68,.25)", transition: "width 1.2s ease" }} />
         </>) : (
-          <div style={{ height: "100%", width: `${score}%`, background: baseC, borderRadius: 3, transition: "width 1.2s ease", boxShadow: `0 0 7px ${baseC}80` }} />
+          <div style={{ height: "100%", width: `${score}%`, background: baseC, borderRadius: 3, transition: "width 1.2s ease" }} />
         )}
       </div>
     </div>
@@ -626,12 +626,16 @@ function Spin({ label = "AI 분석 중..." }) {
 }
 
 // ─── File Upload ──────────────────────────────────────────────────────────────
-function UploadZone({ onReady }) {
+function UploadZone({ onReady, maxFiles = 3, onLimit }) {
   const [drag, setDrag] = useState(false), [proc, setProc] = useState(false), [files, setFiles] = useState([]);
   const ref = useRef();
   const process = async (raw) => {
+    let incoming = Array.from(raw);
+    const room = Math.max(0, maxFiles - files.length);
+    if (incoming.length > room) { incoming = incoming.slice(0, room); onLimit && onLimit(); }
+    if (!incoming.length) return;
     setProc(true); const results = [];
-    for (const f of Array.from(raw)) {
+    for (const f of incoming) {
       try {
         const t = f.type;
         if (t === "application/pdf") {
@@ -653,18 +657,19 @@ function UploadZone({ onReady }) {
         else results.push({ kind: "text", text: await fileToText(f), name: f.name, size: f.size, type: t });
       } catch (e) { console.error(e); }
     }
-    setFiles(results); onReady(results); setProc(false);
+    const next = [...files, ...results].slice(0, maxFiles);
+    setFiles(next); onReady(next); setProc(false);
   };
   const remove = (i) => { const n = files.filter((_, j) => j !== i); setFiles(n); onReady(n); };
   return (
     <div>
       <div onClick={() => ref.current?.click()} onDrop={e => { e.preventDefault(); setDrag(false); process(e.dataTransfer.files); }} onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
         style={{ border: `2px dashed ${drag ? C.accent : C.borderL}`, borderRadius: 11, padding: "22px 18px", textAlign: "center", cursor: "pointer", background: drag ? C.glow : "transparent", transition: "all .2s" }}>
-        <input ref={ref} type="file" accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg" multiple hidden onChange={e => process(e.target.files)} />
+        <input ref={ref} type="file" accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg" multiple hidden onChange={e => { process(e.target.files); e.target.value = ""; }} />
         {proc ? <Spin label="파일 읽는 중..." /> : (<>
           <div style={{ fontSize: 26, marginBottom: 7 }}>☁</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 3 }}>드래그 또는 클릭</div>
-          <div style={{ fontSize: 12, color: C.sub }}>PDF · Word · TXT · 이미지</div>
+          <div style={{ fontSize: 12, color: C.sub }}>PDF · Word · TXT · 이미지 · 최대 {maxFiles}개</div>
         </>)}
       </div>
       {files.length > 0 && <div style={{ marginTop: 9, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -783,7 +788,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish }) {
             : <button onClick={stop} style={{ ...BP(`linear-gradient(135deg,${C.red},#b91c1c)`), display: "flex", alignItems: "center", gap: 7 }}>
               <span style={{ width: 9, height: 9, borderRadius: 2, background: "#fff", display: "inline-block" }} />녹음 중지</button>}
           {candidate.analysis && (
-            <button onClick={() => exportCandidatePDF(candidate, position)} style={{ ...BP(`linear-gradient(135deg,#374151,#1f2937)`), display: "flex", alignItems: "center", gap: 7 }}>
+            <button onClick={() => exportCandidatePDF(candidate, position)} style={{ ...BP(`linear-gradient(135deg,#64748B,#475569)`), display: "flex", alignItems: "center", gap: 7 }}>
               📄 PDF 저장</button>
           )}
           <button onClick={() => { if (recording) stop(); onFinish && onFinish(transcript); }} style={{ ...BP(`linear-gradient(135deg,${C.purple},${C.pink})`), display: "flex", alignItems: "center", gap: 7 }}>
@@ -794,7 +799,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 370px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {(questions || legacyQ) && (
-            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
+            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 12 }}>💬 면접 질문 20개</div>
               {questions ? (<>
                 {[["🧡 인성/컬쳐핏", questions.culture||[], C.amber], ["💼 직무 역량", questions.skill||[], C.accent], ["🚀 미래/방향성", questions.future||[], C.purple], ["⚠️ 킬패스/단점", questions.killpath||[], C.red], ["💡 자기계발", questions.growth||[], C.green], ["📊 데이터 실전능력", questions.dataSkill||[], C.teal], ["⚡ 실행력", questions.execution||[], "#F97316"]].map(([label, qs, color]) => (
@@ -839,7 +844,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish }) {
                 </div>}
             </div>
           </div>
-          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
+          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 10 }}>📝 면접관 메모</div>
             <div style={{ display: "flex", gap: 7, marginBottom: 10 }}>
               <input value={noteInput} onChange={e => setNoteInput(e.target.value)} onKeyDown={e => e.key === "Enter" && addNote()} placeholder="메모 후 Enter..." style={{ ...IS, flex: 1 }} />
@@ -886,7 +891,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish }) {
             )}
           </div>
           {history.length > 1 && (
-            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
+            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: C.sub, marginBottom: 12 }}>📈 점수 변화</div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 60 }}>
                 {history.map((h, i) => (
@@ -899,7 +904,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish }) {
             </div>
           )}
           {candidate.analysis && (
-            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
+            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: C.sub, marginBottom: 12 }}>📋 사전 이력서 분석</div>
               <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 12 }}>
                 <Ring score={candidate.analysis.scores.experienceMatch} size={50} stroke={4} color={C.accent} label="경험" />
@@ -925,8 +930,8 @@ function PositionModal({ onClose, onSave, existing }) {
   const [colorIdx, setColorIdx] = useState(existing?.colorIdx ?? 0);
   const IS = { width: "100%", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "10px 13px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }}>
-      <div style={{ background: C.card, borderRadius: 18, border: `1px solid ${C.border}`, padding: 28, width: 520, maxWidth: "95vw", maxHeight: "88vh", overflowY: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(17,24,39,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }}>
+      <div style={{ background: C.card, borderRadius: 18, border: `1px solid ${C.border}`, boxShadow: "0 10px 40px rgba(0,0,0,.12)", padding: 28, width: 520, maxWidth: "95vw", maxHeight: "88vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>{existing ? "포지션 수정" : "새 포지션 추가"}</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer", fontSize: 20 }}>✕</button>
@@ -936,7 +941,7 @@ function PositionModal({ onClose, onSave, existing }) {
         <label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 6 }}>색상 태그</label>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           {ROLE_COLORS.map((rc, i) => (
-            <div key={i} onClick={() => setColorIdx(i)} style={{ width: 28, height: 28, borderRadius: "50%", background: rc.accent, cursor: "pointer", border: `3px solid ${colorIdx === i ? "#fff" : "transparent"}`, transition: "all .2s", boxShadow: colorIdx === i ? `0 0 10px ${rc.accent}` : "none" }} />
+            <div key={i} onClick={() => setColorIdx(i)} style={{ width: 28, height: 28, borderRadius: "50%", background: rc.accent, cursor: "pointer", border: `3px solid ${colorIdx === i ? "#111827" : "transparent"}`, transition: "all .2s", boxShadow: colorIdx === i ? `0 0 10px ${rc.accent}66` : "none" }} />
           ))}
         </div>
         <label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 6 }}>채용 공고 (JD)</label>
@@ -957,7 +962,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
   const rc = ROLE_COLORS[position?.colorIdx || 0];
   const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 8, color: "#fff", padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" });
   const IS = { width: "100%", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "10px 13px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
-  const Card = { background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 18 };
+  const Card = { background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 18 };
 
   const [ev, setEv] = useState({ id: "", name: "" });
   const [nameInput, setNameInput] = useState("");
@@ -1121,7 +1126,7 @@ function ReportView({ candidates, positions, onExport }) {
   const hold = candidates.filter(c => c.finalDecision?.result === "보류");
   const rejected = candidates.filter(c => c.finalDecision?.result === "불합격");
   const interviewed = candidates.filter(c => c.interviewFeedback || c.finalDecision);
-  const Card = { background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 18 };
+  const Card = { background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 18 };
   const kpi = [["전체 후보", candidates.length, C.text], ["면접 완료", interviewed.length, C.accent], ["합격", passed.length, C.green], ["보류", hold.length, C.amber], ["불합격", rejected.length, C.red]];
 
   return (
@@ -1257,7 +1262,7 @@ function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onR
   const busy = analyzingIds.has(c.id);
   const a = c.analysis;
   return (
-    <div style={{ background: C.card, borderRadius: 15, border: `1px solid ${C.border}`, padding: 20, cursor: "pointer", position: "relative", transition: "all .22s" }}
+    <div style={{ background: C.card, borderRadius: 15, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 20, cursor: "pointer", position: "relative", transition: "all .22s" }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = rc.accent; e.currentTarget.style.transform = "translateY(-2px)"; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}
       onClick={onSelect}>
@@ -1551,6 +1556,18 @@ export default function HireL() {
   // 하위 호환 alias
   const doAnalyze = doAnalyzeAndSync;
 
+  // "+ 후보자" 클릭 시 포지션 자동 선택: 현재 필터 → "마케터" 포함 첫 포지션 → 첫 포지션
+  const openAddCandidate = () => {
+    let pid = "";
+    if (selectedPositionId !== "all" && positions.some(p => p.id === selectedPositionId)) pid = selectedPositionId;
+    else {
+      const mk = positions.find(p => (p.name || "").includes("마케터"));
+      pid = mk ? mk.id : (positions[0]?.id || "");
+    }
+    setAddForm(p => ({ ...p, positionId: pid, showNewPos: false }));
+    setShowAddCandidate(true);
+  };
+
   const addCandidate = () => {
     if (!addForm.name || !addForm.positionId) return;
     let resume = addForm.resume;
@@ -1700,7 +1717,7 @@ export default function HireL() {
       </Head>
 
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: toast.type === "error" ? C.red : C.green, color: "#fff", padding: "10px 20px", borderRadius: 24, fontSize: 13, fontWeight: 600, zIndex: 9999, boxShadow: "0 4px 20px rgba(0,0,0,.4)", transition: "all .3s" }}>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: toast.type === "error" ? C.red : C.green, color: "#fff", padding: "10px 20px", borderRadius: 24, fontSize: 13, fontWeight: 600, zIndex: 9999, boxShadow: "0 4px 20px rgba(0,0,0,.15)", transition: "all .3s" }}>
           {toast.type === "error" ? "❌ " : "✓ "}{toast.msg}
         </div>
       )}
@@ -1730,7 +1747,7 @@ export default function HireL() {
               📥 불러오기
             </button>
             {!syncEnabled ? (
-              <button onClick={createRoom} style={{ ...BP(`linear-gradient(135deg,${C.green},${C.teal})`), padding: "7px 16px", fontSize: 12, display: "flex", alignItems: "center", gap: 6, boxShadow: `0 0 14px ${C.green}50` }}>
+              <button onClick={createRoom} style={{ ...BP(`linear-gradient(135deg,${C.green},${C.teal})`), padding: "7px 16px", fontSize: 12, display: "flex", alignItems: "center", gap: 6, boxShadow: "0 1px 3px rgba(0,0,0,.1)" }}>
                 🔴 실시간 공유 시작
               </button>
             ) : (
@@ -1753,7 +1770,7 @@ export default function HireL() {
             <button onClick={() => { if(confirm("저장된 데이터를 전부 초기화할까요?")) { localStorage.removeItem("hirel_data"); window.location.reload(); } }} style={{ ...BP("transparent"), border: `1px solid ${C.red}40`, color: C.red, boxShadow: "none", padding: "7px 14px", fontSize: 12 }}>
               🗑 초기화
             </button>
-            <button onClick={() => setShowAddCandidate(true)} style={{ ...BP(), padding: "8px 16px", fontSize: 13 }}>+ 후보자</button>
+            <button onClick={openAddCandidate} style={{ ...BP(), padding: "8px 16px", fontSize: 13 }}>+ 후보자</button>
             <button onClick={() => { setEditingPosition(null); setShowPositionModal(true); }} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.accent, boxShadow: "none", padding: "8px 16px", fontSize: 13 }}>+ 포지션</button>
           </div>
         </div>
@@ -1834,7 +1851,7 @@ export default function HireL() {
                       const idx = STAGES.indexOf(c.stage || "서류검토");
                       const arrowBtn = (disabled) => ({ flex: 1, padding: "4px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface, color: disabled ? C.muted : C.sub, cursor: disabled ? "default" : "pointer", fontSize: 11, fontFamily: "inherit", opacity: disabled ? .35 : 1 });
                       return (
-                        <div key={c.id} style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, padding: "10px 11px", marginBottom: 8, cursor: "pointer" }}
+                        <div key={c.id} style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: "10px 11px", marginBottom: 8, cursor: "pointer" }}
                           onClick={() => { setSelectedCandidateId(c.id); setActiveTab("overview"); setView("detail"); }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
                             <span style={{ fontSize: 13, fontWeight: 700 }}>{c.name}</span>
@@ -1941,7 +1958,7 @@ export default function HireL() {
                           <div style={{ fontSize: 11, color: C.sub }}>종합 점수</div>
                         </div>
                         <div style={{ padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 700, background: vStyle(a.verdict).bg, border: `1px solid ${vStyle(a.verdict).border}`, color: vStyle(a.verdict).color }}>{a.verdict}</div>
-                        <button onClick={() => exportCandidatePDF(c, pos)} style={{ ...BP(`linear-gradient(135deg,#374151,#1f2937)`), padding: "8px 14px", fontSize: 13 }}>📄 PDF 저장</button>
+                        <button onClick={() => exportCandidatePDF(c, pos)} style={{ ...BP(`linear-gradient(135deg,#64748B,#475569)`), padding: "8px 14px", fontSize: 13 }}>📄 PDF 저장</button>
                         <button onClick={() => { setInterviewCandidateId(c.id); setView("interview"); }} style={{ ...BP(`linear-gradient(135deg,${C.purple},${C.pink})`), padding: "8px 14px", fontSize: 13 }}>🎤 면접 시작</button>
                         <button onClick={() => doAnalyze(c)} style={{ ...BP(), padding: "8px 14px", fontSize: 13 }}>재분석</button>
                       </div>
@@ -1968,7 +1985,7 @@ export default function HireL() {
                   {busy ? <Spin label="AI가 분석하고 있습니다..." /> : !a ? <div style={{ textAlign: "center", padding: "50px 0" }}><button onClick={() => doAnalyze(c)} style={BP()}>AI 분석 시작</button></div> : (<>
                     {activeTab === "overview" && (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                        <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 22 }}>
+                        <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 22 }}>
                           <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 16, color: C.sub }}>SCORE BREAKDOWN</h3>
                           <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 20 }}>
                             <Ring score={a.scores.experienceMatch} label="직무 경험" color={rc.accent} />
@@ -1987,12 +2004,12 @@ export default function HireL() {
                           <Bar label="성장 가능성" score={a.scores.growthPotential} revised={c.interviewFeedback?.revisedScores?.growthPotential} />
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
-                          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 18 }}>
+                          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 18 }}>
                             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 9 }}>✦ AI 요약</h3>
                             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, margin: 0 }}>{a.summary}</p>
                           </div>
                           {a.v2Scores && (
-                            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
+                            <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                                 <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>🎯 큐라엘 v2 축</h3>
                                 <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, color: sc(v2WeightedTotal(a.v2Scores)), fontFamily: "'DM Mono',monospace" }}>{v2WeightedTotal(a.v2Scores)}점</span>
@@ -2019,11 +2036,11 @@ export default function HireL() {
                               </table>
                             </div>
                           )}
-                          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
+                          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
                             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 9 }}>강점</h3>
                             {a.strengths?.map((s, i) => <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}><span style={{ color: C.green }}>✓</span><span style={{ fontSize: 13, color: C.sub }}>{s}</span></div>)}
                           </div>
-                          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 16 }}>
+                          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
                             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 9 }}>약점 / 우려사항</h3>
                             {a.weaknesses?.map((w, i) => <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}><span style={{ color: C.amber }}>△</span><span style={{ fontSize: 13, color: C.sub }}>{w}</span></div>)}
                           </div>
@@ -2031,14 +2048,14 @@ export default function HireL() {
                       </div>
                     )}
                     {activeTab === "keywords" && (
-                      <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 24 }}>
+                      <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 24 }}>
                         <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>역량 키워드 분석</h3>
                         <p style={{ fontSize: 12, color: C.sub, marginBottom: 20 }}>JD 매칭 여부에 따라 색상 구분</p>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>{a.keywords?.map((kw, i) => <Tag key={i} text={kw.word} type={kw.type} />)}</div>
                       </div>
                     )}
                     {activeTab === "interview" && (
-                      <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 24 }}>
+                      <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 24 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
                           <div><h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>AI 추천 면접 질문 20개</h3><p style={{ fontSize: 12, color: C.sub, margin: 0 }}>큐라엘 컬쳐핏 기반 맞춤 생성</p></div>
                           <button onClick={() => { setInterviewCandidateId(c.id); setView("interview"); }} style={{ ...BP(`linear-gradient(135deg,${C.purple},${C.pink})`), padding: "8px 16px", fontSize: 13 }}>🎤 면접 시작</button>
@@ -2068,7 +2085,7 @@ export default function HireL() {
                       </div>
                     )}
                     {activeTab === "resume" && (
-                      <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, padding: 24 }}>
+                      <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 24 }}>
                         <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>제출된 이력서</h3>
                         {c.fileNames?.length > 0 && <div style={{ marginBottom: 14, display: "flex", gap: 7, flexWrap: "wrap" }}>
                           {c.fileNames.map((fn, i) => (
@@ -2092,11 +2109,22 @@ export default function HireL() {
       </div>
 
       {showAddCandidate && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }}>
-          <div style={{ background: C.card, borderRadius: 18, border: `1px solid ${C.border}`, padding: 28, width: 520, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(17,24,39,.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }}>
+          <div style={{ background: C.card, borderRadius: 18, border: `1px solid ${C.border}`, boxShadow: "0 10px 40px rgba(0,0,0,.12)", padding: 28, width: 520, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>후보자 등록</h3>
               <button onClick={() => setShowAddCandidate(false)} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer", fontSize: 20 }}>✕</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11, marginBottom: 16 }}>
+              <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>이름 *</label><input value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} placeholder="홍길동" style={IS} /></div>
+              <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>나이</label><input value={addForm.age} onChange={e => setAddForm(p => ({ ...p, age: e.target.value }))} placeholder="30" type="number" style={IS} /></div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>지원 채널</label>
+              <select value={addForm.channel || "기타"} onChange={e => setAddForm(p => ({ ...p, channel: e.target.value }))} style={{ ...IS, cursor: "pointer" }}>
+                {CHANNELS.map(ch => <option key={ch} value={ch}>{ch}</option>)}
+              </select>
             </div>
 
             <label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 8 }}>포지션 선택 *</label>
@@ -2121,7 +2149,7 @@ export default function HireL() {
                   <input value={addForm.newPosName || ""} onChange={e => setAddForm(p => ({ ...p, newPosName: e.target.value }))} placeholder="포지션명 (예: 마케터)" style={{ ...IS }} />
                   <div style={{ display: "flex", gap: 6 }}>
                     {ROLE_COLORS.map((rc, i) => (
-                      <div key={i} onClick={() => setAddForm(p => ({ ...p, newPosColorIdx: i }))} style={{ width: 22, height: 22, borderRadius: "50%", background: rc.accent, cursor: "pointer", border: `2px solid ${(addForm.newPosColorIdx ?? 0) === i ? "#fff" : "transparent"}`, flexShrink: 0 }} />
+                      <div key={i} onClick={() => setAddForm(p => ({ ...p, newPosColorIdx: i }))} style={{ width: 22, height: 22, borderRadius: "50%", background: rc.accent, cursor: "pointer", border: `2px solid ${(addForm.newPosColorIdx ?? 0) === i ? "#111827" : "transparent"}`, flexShrink: 0 }} />
                     ))}
                   </div>
                 </div>
@@ -2138,22 +2166,12 @@ export default function HireL() {
               </div>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11, marginBottom: 16 }}>
-              <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>이름 *</label><input value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} placeholder="홍길동" style={IS} /></div>
-              <div><label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>나이</label><input value={addForm.age} onChange={e => setAddForm(p => ({ ...p, age: e.target.value }))} placeholder="30" type="number" style={IS} /></div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 13, color: C.sub, display: "block", marginBottom: 5 }}>지원 채널</label>
-              <select value={addForm.channel || "기타"} onChange={e => setAddForm(p => ({ ...p, channel: e.target.value }))} style={{ ...IS, cursor: "pointer" }}>
-                {CHANNELS.map(ch => <option key={ch} value={ch}>{ch}</option>)}
-              </select>
-            </div>
             <div style={{ display: "flex", background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}`, marginBottom: 13 }}>
               {[["file", "📎 파일 업로드"], ["text", "✏️ 텍스트 입력"]].map(([m, l]) => (
                 <button key={m} onClick={() => setAddForm(p => ({ ...p, inputMode: m }))} style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "none", fontSize: 13, fontWeight: 500, background: addForm.inputMode === m ? C.accent : "transparent", color: addForm.inputMode === m ? "#fff" : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{l}</button>
               ))}
             </div>
-            {addForm.inputMode === "file" && <UploadZone onReady={setUploadedFiles} />}
+            {addForm.inputMode === "file" && <UploadZone onReady={setUploadedFiles} maxFiles={3} onLimit={() => showToast("최대 3개까지 업로드됩니다", "error")} />}
             {addForm.inputMode === "text" && <textarea value={addForm.resume} onChange={e => setAddForm(p => ({ ...p, resume: e.target.value }))} placeholder="이력서 내용 붙여넣기..." rows={7} style={{ ...IS, resize: "vertical" }} />}
             <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
               <button onClick={addCandidate} disabled={!addForm.name || !addForm.positionId || (addForm.inputMode === "file" && !uploadedFiles.length) || (addForm.inputMode === "text" && !addForm.resume)}
