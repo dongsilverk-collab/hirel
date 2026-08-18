@@ -1260,6 +1260,17 @@ function PortfolioCheck({ candidate, onUpdate, compact }) {
 // ─── 첨부 개수 (업로드 파일 + 사내 폴더 경로 참조 합산) ─────────────────────────
 const attachCount = (c) => ((c.fileRefs?.length) || 0) + ((c.fileNames?.length) || 0);
 
+// ─── ⭐ 별표(즐겨찾기) 토글 버튼 — 카드/보드/자료실/상세 공용 ─────────────────────
+const STAR_COLOR = "#F59E0B";
+function StarButton({ on, onToggle, size = 16 }) {
+  return (
+    <button onClick={e => { e.stopPropagation(); onToggle && onToggle(); }} title={on ? "별표 해제" : "별표 표시"}
+      style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: size, lineHeight: 1, color: on ? STAR_COLOR : C.muted, fontFamily: "inherit", transition: "color .15s, transform .15s" }}>
+      {on ? "★" : "☆"}
+    </button>
+  );
+}
+
 // ─── 수동 채점 (v2 축 6개) — AI vs 수동 나란히 비교 ─────────────────────────────
 function ManualV2Card({ candidate, onSave, showToast }) {
   const ai = candidate.analysis?.v2Scores || null;
@@ -1374,7 +1385,7 @@ function FileRefsSection({ candidate, onUpdate, showToast }) {
 }
 
 // ─── 🗂 자료실 뷰 (플랫폼 통합 테이블) ──────────────────────────────────────────
-function LibraryView({ candidates, positions, onSelect }) {
+function LibraryView({ candidates, positions, onSelect, onToggleStar }) {
   const [sortKey, setSortKey] = useState("name");
   const [sortDir, setSortDir] = useState(1);
   const posName = (id) => positions.find(p => p.id === id)?.name || "미지정";
@@ -1384,7 +1395,8 @@ function LibraryView({ candidates, positions, onSelect }) {
   const sorted = [...candidates].sort((a, b) => {
     if (sortKey === "name") return a.name.localeCompare(b.name, "ko") * sortDir;
     let va = 0, vb = 0;
-    if (sortKey === "ai") { va = aiScore(a) ?? -1; vb = aiScore(b) ?? -1; }
+    if (sortKey === "star") { va = a.starred ? 1 : 0; vb = b.starred ? 1 : 0; }
+    else if (sortKey === "ai") { va = aiScore(a) ?? -1; vb = aiScore(b) ?? -1; }
     else if (sortKey === "manual") { va = manualScore(a) ?? -1; vb = manualScore(b) ?? -1; }
     else if (sortKey === "stage") { va = STAGES.indexOf(a.stage || "서류검토"); vb = STAGES.indexOf(b.stage || "서류검토"); }
     else if (sortKey === "files") { va = attachCount(a); vb = attachCount(b); }
@@ -1430,6 +1442,7 @@ function LibraryView({ candidates, positions, onSelect }) {
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead><tr style={{ background: C.surface }}>
+              {th("★", "star", true)}
               {th("이름", "name")}
               {th("채널", null)}
               {th("포지션", null)}
@@ -1442,7 +1455,7 @@ function LibraryView({ candidates, positions, onSelect }) {
             </tr></thead>
             <tbody>
               {sorted.length === 0 && (
-                <tr><td colSpan={9} style={{ padding: "26px 12px", textAlign: "center", color: C.muted, fontSize: 13 }}>표시할 후보가 없습니다 — 필터를 확인하세요</td></tr>
+                <tr><td colSpan={10} style={{ padding: "26px 12px", textAlign: "center", color: C.muted, fontSize: 13 }}>표시할 후보가 없습니다 — 필터를 확인하세요</td></tr>
               )}
               {sorted.map(c => {
                 const stage = c.stage || "서류검토";
@@ -1455,6 +1468,9 @@ function LibraryView({ candidates, positions, onSelect }) {
                   <tr key={c.id} onClick={() => onSelect(c.id)} style={{ cursor: "pointer", transition: "background .15s" }}
                     onMouseEnter={e => { e.currentTarget.style.background = C.surface; }}
                     onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                    <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, textAlign: "center", width: 36 }}>
+                      <StarButton on={!!c.starred} onToggle={() => onToggleStar && onToggleStar(c.id)} size={15} />
+                    </td>
                     <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>{c.name}{c.age ? <span style={{ fontWeight: 400, color: C.muted, fontSize: 11 }}> · {c.age}세</span> : ""}</td>
                     <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}` }}><ChannelBadge channel={c.channel} small /></td>
                     <td style={{ padding: "10px 12px", borderBottom: `1px solid ${C.border}`, color: C.sub, whiteSpace: "nowrap" }}>{posName(c.positionId)}</td>
@@ -1478,9 +1494,12 @@ function LibraryView({ candidates, positions, onSelect }) {
 }
 
 // ─── Candidate Card ───────────────────────────────────────────────────────────
-function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onReanalyze, onExportPDF, onDecision, position }) {
+function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onReanalyze, onExportPDF, onDecision, onToggleStar, onStage, position }) {
   const busy = analyzingIds.has(c.id);
   const a = c.analysis;
+  const stage = c.stage || "서류검토";
+  const stCol = STAGE_COLORS[stage] || C.sub;
+  const QUICK_STAGES = [["서류", "서류검토"], ["면접", "면접"], ["탈락", "탈락"]];
   return (
     <div style={{ background: C.card, borderRadius: 15, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 20, cursor: "pointer", position: "relative", transition: "all .22s" }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = rc.accent; e.currentTarget.style.transform = "translateY(-2px)"; }}
@@ -1492,16 +1511,18 @@ function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onR
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</span>
+            <StarButton on={!!c.starred} onToggle={onToggleStar} />
             <ChannelBadge channel={c.channel} small />
           </div>
           <div style={{ fontSize: 11, color: C.sub }}>{c.age ? `${c.age}세` : ""}{attachCount(c) > 0 && <span style={{ marginLeft: 5 }}>📎{attachCount(c)}</span>}</div>
         </div>
-        {(c.finalDecision || c.interviewFeedback || c.manualScores || (!busy && a)) && <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <span style={{ padding: "3px 9px", borderRadius: 16, fontSize: 10, fontWeight: 700, background: `${stCol}18`, border: `1px solid ${stCol}40`, color: stCol, whiteSpace: "nowrap" }}>{stage}</span>
           {c.manualScores && <span style={{ padding: "3px 9px", borderRadius: 16, fontSize: 10, fontWeight: 700, background: C.glow, border: `1px solid ${C.accent}40`, color: C.accent }}>수동 {v2WeightedTotal(c.manualScores)}</span>}
           {c.interviewFeedback && <span style={{ padding: "3px 9px", borderRadius: 16, fontSize: 10, fontWeight: 700, background: "rgba(139,92,246,.15)", border: "1px solid rgba(139,92,246,.35)", color: C.purple }}>면접 완료</span>}
           {c.finalDecision && <span style={{ padding: "3px 10px", borderRadius: 16, fontSize: 11, fontWeight: 700, background: (DEC_STYLE[c.finalDecision.result] || {}).bg, border: `1px solid ${(DEC_STYLE[c.finalDecision.result] || {}).b}`, color: (DEC_STYLE[c.finalDecision.result] || {}).c }}>{c.finalDecision.result}</span>}
           {!busy && a && <span style={{ padding: "3px 10px", borderRadius: 16, fontSize: 11, fontWeight: 700, background: vStyle(a.verdict).bg, border: `1px solid ${vStyle(a.verdict).border}`, color: vStyle(a.verdict).color }}>{a.verdict}</span>}
-        </div>}
+        </div>
       </div>
       {busy ? <Spin /> : a ? (<>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
@@ -1529,6 +1550,18 @@ function CandidateCard({ c, rc, analyzingIds, vStyle, onSelect, onInterview, onR
           <button onClick={e => { e.stopPropagation(); onReanalyze(); }} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 12px", color: C.sub, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>분석 시작</button>
         </div>
       )}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+        <span style={{ fontSize: 10, color: C.muted, whiteSpace: "nowrap" }}>단계</span>
+        {QUICK_STAGES.map(([label, st]) => {
+          const active = stage === st;
+          const col = STAGE_COLORS[st] || C.sub;
+          return (
+            <button key={st} onClick={e => { e.stopPropagation(); onStage && onStage(st); }}
+              title={active ? `현재 단계: ${st}` : `${st} 단계로 이동`}
+              style={{ flex: 1, padding: "5px 0", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: active ? col : "transparent", border: `1px solid ${active ? col : C.border}`, color: active ? "#fff" : C.sub, transition: "all .15s" }}>{label}</button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1549,6 +1582,7 @@ export default function HireL() {
   const [candidates, setCandidates] = useState([]);
   const [selectedPositionId, setSelectedPositionId] = useState("all");
   const [selectedChannel, setSelectedChannel] = useState("all");
+  const [starredOnly, setStarredOnly] = useState(false);
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
   const [interviewCandidateId, setInterviewCandidateId] = useState(null);
   const [decisionCandidateId, setDecisionCandidateId] = useState(null);
@@ -1613,6 +1647,7 @@ export default function HireL() {
           id: c.id, positionId: c.positionId, name: c.name, age: c.age,
           channel: c.channel || "기타",
           stage: c.stage || "서류검토",
+          starred: !!c.starred,
           portfolioCheck: c.portfolioCheck || null,
           fileNames: c.fileNames || [],
           fileRefs: c.fileRefs || [],
@@ -1752,6 +1787,19 @@ export default function HireL() {
     if (ni !== idx) updateCandidate(c.id, { stage: STAGES[ni] });
   };
 
+  // ⭐ 별표 토글 (카드/보드/자료실/상세 공용)
+  const toggleStar = (id) => {
+    const cur = candidates.find(x => x.id === id);
+    updateCandidate(id, { starred: !(cur && cur.starred) });
+  };
+
+  // 카드 퀵 액션: 서류/면접/탈락 단계 즉시 이동 + 토스트
+  const quickStage = (c, stage) => {
+    if ((c.stage || "서류검토") === stage) return;
+    updateCandidate(c.id, { stage });
+    showToast(`${c.name} — ${stage} 단계로 이동`);
+  };
+
   const doAnalyzeAndSync = async (c) => {
     const pos = positions.find(p => p.id === c.positionId);
     if (!pos) { showToast("포지션을 찾을 수 없습니다", "error"); return; }
@@ -1858,6 +1906,7 @@ export default function HireL() {
           positionName: pos?.name || "미지정",
           channel: c.channel || "기타",
           stage: c.stage || "서류검토",
+          starred: !!c.starred,
           portfolioCheck: c.portfolioCheck || null,
           fileRefs: c.fileRefs || [],
           manualScores: c.manualScores || null,
@@ -1891,8 +1940,9 @@ export default function HireL() {
   const interviewPosition = positions.find(p => p.id === interviewCandidate?.positionId);
   const decisionCandidate = candidates.find(c => c.id === decisionCandidateId);
   const decisionPosition = positions.find(p => p.id === decisionCandidate?.positionId);
-  // 채널 필터 (포지션 필터와 AND 조합 — 대시보드/보드 공통)
-  const channelFiltered = selectedChannel === "all" ? candidates : candidates.filter(c => (c.channel || "기타") === selectedChannel);
+  // 채널 필터 (포지션 필터와 AND 조합 — 대시보드/보드 공통) · ★ 별표만 필터 선적용
+  const starFiltered = starredOnly ? candidates.filter(c => c.starred) : candidates;
+  const channelFiltered = selectedChannel === "all" ? starFiltered : starFiltered.filter(c => (c.channel || "기타") === selectedChannel);
   const filteredCandidates = selectedPositionId === "all" ? channelFiltered : channelFiltered.filter(c => c.positionId === selectedPositionId);
   const grouped = positions.map(pos => ({ pos, cands: [...channelFiltered.filter(c => c.positionId === pos.id)].sort((a, b) => (b.analysis?.totalScore || 0) - (a.analysis?.totalScore || 0)) })).filter(g => g.cands.length > 0);
 
@@ -2045,6 +2095,10 @@ export default function HireL() {
                 </button>
               );
             })}
+            <span style={{ width: 1, height: 14, background: C.border, margin: "0 4px" }} />
+            <button onClick={() => setStarredOnly(s => !s)} style={{ padding: "3px 11px", borderRadius: 14, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: starredOnly ? `${STAR_COLOR}20` : "transparent", border: `1px solid ${starredOnly ? STAR_COLOR : C.border}`, color: starredOnly ? STAR_COLOR : C.sub }}>
+              ★ 별표만 <span style={{ fontFamily: "'DM Mono',monospace", color: starredOnly ? STAR_COLOR : C.muted }}>{candidates.filter(c => c.starred).length}</span>
+            </button>
           </div>
         )}
       </div>
@@ -2054,7 +2108,7 @@ export default function HireL() {
           <ReportView candidates={candidates} positions={positions} onExport={() => exportRecruitmentReport(candidates, positions)} />
         )}
         {view === "library" && (
-          <LibraryView candidates={filteredCandidates} positions={positions} onSelect={(id) => { setSelectedCandidateId(id); setActiveTab("overview"); setView("detail"); }} />
+          <LibraryView candidates={filteredCandidates} positions={positions} onSelect={(id) => { setSelectedCandidateId(id); setActiveTab("overview"); setView("detail"); }} onToggleStar={toggleStar} />
         )}
         {view === "board" && (
           <div>
@@ -2087,6 +2141,7 @@ export default function HireL() {
                           onClick={() => { setSelectedCandidateId(c.id); setActiveTab("overview"); setView("detail"); }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
                             <span style={{ fontSize: 13, fontWeight: 700 }}>{c.name}</span>
+                            <StarButton on={!!c.starred} onToggle={() => toggleStar(c.id)} size={14} />
                             {c.analysis && <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: sc(c.analysis.totalScore), fontFamily: "'DM Mono',monospace" }}>{c.analysis.totalScore}</span>}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 7 }}>
@@ -2150,7 +2205,7 @@ export default function HireL() {
                         <button onClick={() => setSelectedPositionId(pos.id)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 10px", color: C.sub, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>이 포지션만 보기</button>
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 14 }}>
-                        {cands.map(c => (<CandidateCard key={c.id} c={c} rc={rc} position={pos} analyzingIds={analyzingIds} vStyle={vStyle} onSelect={() => { setSelectedCandidateId(c.id); setActiveTab("overview"); setView("detail"); }} onInterview={() => { setInterviewCandidateId(c.id); setView("interview"); }} onReanalyze={() => doAnalyze(c)} onExportPDF={() => exportCandidatePDF(c, pos)} onDecision={() => { setDecisionCandidateId(c.id); setView("decision"); }} />))}
+                        {cands.map(c => (<CandidateCard key={c.id} c={c} rc={rc} position={pos} analyzingIds={analyzingIds} vStyle={vStyle} onSelect={() => { setSelectedCandidateId(c.id); setActiveTab("overview"); setView("detail"); }} onInterview={() => { setInterviewCandidateId(c.id); setView("interview"); }} onReanalyze={() => doAnalyze(c)} onExportPDF={() => exportCandidatePDF(c, pos)} onDecision={() => { setDecisionCandidateId(c.id); setView("decision"); }} onToggleStar={() => toggleStar(c.id)} onStage={(st) => quickStage(c, st)} />))}
                       </div>
                     </div>
                   );
@@ -2161,7 +2216,7 @@ export default function HireL() {
                 {[...filteredCandidates].sort((a, b) => (b.analysis?.totalScore || 0) - (a.analysis?.totalScore || 0)).map(c => {
                   const pos = positions.find(p => p.id === c.positionId);
                   const rc = ROLE_COLORS[pos?.colorIdx || 0];
-                  return (<CandidateCard key={c.id} c={c} rc={rc} position={pos} analyzingIds={analyzingIds} vStyle={vStyle} onSelect={() => { setSelectedCandidateId(c.id); setActiveTab("overview"); setView("detail"); }} onInterview={() => { setInterviewCandidateId(c.id); setView("interview"); }} onReanalyze={() => doAnalyze(c)} onExportPDF={() => exportCandidatePDF(c, pos)} onDecision={() => { setDecisionCandidateId(c.id); setView("decision"); }} />);
+                  return (<CandidateCard key={c.id} c={c} rc={rc} position={pos} analyzingIds={analyzingIds} vStyle={vStyle} onSelect={() => { setSelectedCandidateId(c.id); setActiveTab("overview"); setView("detail"); }} onInterview={() => { setInterviewCandidateId(c.id); setView("interview"); }} onReanalyze={() => doAnalyze(c)} onExportPDF={() => exportCandidatePDF(c, pos)} onDecision={() => { setDecisionCandidateId(c.id); setView("decision"); }} onToggleStar={() => toggleStar(c.id)} onStage={(st) => quickStage(c, st)} />);
                 })}
               </div>
             )}
@@ -2187,6 +2242,7 @@ export default function HireL() {
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                         <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>{c.name}</h2>
+                        <StarButton on={!!c.starred} onToggle={() => toggleStar(c.id)} size={20} />
                         <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 14, background: `${rc.accent}20`, border: `1px solid ${rc.accent}40`, color: rc.accent, fontWeight: 600 }}>{pos?.name}</span>
                         <ChannelBadge channel={c.channel} />
                         <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 12, background: `${STAGE_COLORS[c.stage || "서류검토"]}18`, border: `1px solid ${STAGE_COLORS[c.stage || "서류검토"]}40`, color: STAGE_COLORS[c.stage || "서류검토"], fontWeight: 600 }}>{c.stage || "서류검토"}</span>
