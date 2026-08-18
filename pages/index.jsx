@@ -98,7 +98,7 @@ async function callAI(body) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "claude-sonnet-5", max_tokens: 4000, ...body }),
+      body: JSON.stringify({ model: "claude-sonnet-5", max_tokens: 9000, ...body }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
@@ -2320,7 +2320,19 @@ export default function HireL() {
                 const isFail = stage === "탈락";
                 const cands = filteredCandidates.filter(c => (c.stage || "서류검토") === stage);
                 return (
-                  <div key={stage} style={{ width: 232, minWidth: 232, flexShrink: 0, background: isFail ? "rgba(100,116,139,.08)" : C.surface, borderRadius: 12, border: `1px solid ${isFail ? C.border : `${col}35`}`, padding: 10 }}>
+                  <div key={stage}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => {
+                      e.preventDefault();
+                      const cid = e.dataTransfer.getData("text/plain");
+                      if (!cid) return;
+                      const cand = candidates.find(x => x.id === cid);
+                      if (cand && (cand.stage || "서류검토") !== stage) {
+                        updateCandidate(cid, { stage });
+                        showToast(`${cand.name} — ${stage} 단계로 이동`);
+                      }
+                    }}
+                    style={{ width: 232, minWidth: 232, flexShrink: 0, background: isFail ? "rgba(100,116,139,.08)" : C.surface, borderRadius: 12, border: `1px solid ${isFail ? C.border : `${col}35`}`, padding: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, padding: "2px 4px" }}>
                       <div style={{ width: 8, height: 8, borderRadius: "50%", background: col }} />
                       <span style={{ fontSize: 13, fontWeight: 700, color: isFail ? C.muted : C.text }}>{stage}</span>
@@ -2333,7 +2345,9 @@ export default function HireL() {
                       const idx = STAGES.indexOf(c.stage || "서류검토");
                       const arrowBtn = (disabled) => ({ flex: 1, padding: "4px 0", borderRadius: 6, border: `1px solid ${C.border}`, background: C.surface, color: disabled ? C.muted : C.sub, cursor: disabled ? "default" : "pointer", fontSize: 11, fontFamily: "inherit", opacity: disabled ? .35 : 1 });
                       return (
-                        <div key={c.id} style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: "10px 11px", marginBottom: 8, cursor: "pointer" }}
+                        <div key={c.id} draggable
+                          onDragStart={e => { e.dataTransfer.setData("text/plain", c.id); e.dataTransfer.effectAllowed = "move"; }}
+                          style={{ background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: "10px 11px", marginBottom: 8, cursor: "grab" }}
                           onClick={() => { setSelectedCandidateId(c.id); setActiveTab("overview"); setView("detail"); }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
                             <span style={{ fontSize: 13, fontWeight: 700 }}>{c.name}</span>
