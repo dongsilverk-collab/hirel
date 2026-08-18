@@ -825,6 +825,41 @@ function QuestionScoreSummary({ candidate, title }) {
 }
 
 // ─── Interview Room ───────────────────────────────────────────────────────────
+// ─── 면접 조건 기록 (입사 가능 시기·희망 연봉) ─────────────────────────────
+const START_PRESETS = ["즉시", "2주 이내", "1개월 이내", "협의 필요"];
+const SALARY_PRESETS = ["4,000", "4,500", "5,000", "5,500", "협의"];
+function ConditionsCard({ candidate, onUpdate }) {
+  const cond = candidate.conditions || {};
+  const [custom, setCustom] = useState({ start: "", salary: "" });
+  const save = (patch) => onUpdate && onUpdate({ conditions: { ...cond, ...patch, at: Date.now() } });
+  const chip = (on) => ({ padding: "5px 11px", borderRadius: 16, border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.glow : C.card, color: on ? C.accent : C.sub, fontSize: 12, fontWeight: on ? 700 : 500, cursor: "pointer", fontFamily: "inherit" });
+  return (
+    <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 10 }}>🗓 조건 기록 <span style={{ fontWeight: 400, color: C.muted, fontSize: 11 }}>· 면접 중 클릭해서 기입</span></div>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>입사 가능 시기</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        {START_PRESETS.map(p => <button key={p} onClick={() => save({ start: cond.start === p ? "" : p })} style={chip(cond.start === p)}>{p}</button>)}
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        <input value={custom.start} onChange={e => setCustom(s => ({ ...s, start: e.target.value }))} onKeyDown={e => { if (e.key === "Enter" && custom.start.trim()) { save({ start: custom.start.trim() }); setCustom(s => ({ ...s, start: "" })); } }} placeholder="직접 입력 (예: 9월 초) 후 Enter" style={{ flex: 1, padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+        {cond.start && !START_PRESETS.includes(cond.start) && <span style={{ ...chip(true), cursor: "default" }}>{cond.start}</span>}
+      </div>
+      <div style={{ fontSize: 11.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>희망 연봉 (만원)</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        {SALARY_PRESETS.map(p => <button key={p} onClick={() => save({ salary: cond.salary === p ? "" : p })} style={chip(cond.salary === p)}>{p}</button>)}
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        <input value={custom.salary} onChange={e => setCustom(s => ({ ...s, salary: e.target.value }))} onKeyDown={e => { if (e.key === "Enter" && custom.salary.trim()) { save({ salary: custom.salary.trim() }); setCustom(s => ({ ...s, salary: "" })); } }} placeholder="직접 입력 (예: 5,200 또는 4,800~5,300) 후 Enter" style={{ flex: 1, padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+        {cond.salary && !SALARY_PRESETS.includes(cond.salary) && <span style={{ ...chip(true), cursor: "default" }}>{cond.salary}</span>}
+      </div>
+      <input value={cond.note || ""} onChange={e => save({ note: e.target.value })} placeholder="조건 메모 (예: 현 직장 인수인계 2주, 스톡옵션 관심)" style={{ width: "100%", padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+      {(cond.start || cond.salary) && (
+        <div style={{ marginTop: 9, fontSize: 12, fontWeight: 600, color: C.green }}>✓ 기록됨 — 입사: {cond.start || "미정"} · 연봉: {cond.salary || "미정"}{cond.salary && !String(cond.salary).includes("협의") && parseInt(String(cond.salary).replace(/[^0-9]/g, "")) > 5500 ? <span style={{ color: C.red, marginLeft: 6 }}>⚠ 상한(5,500) 초과</span> : null}</div>
+      )}
+    </div>
+  );
+}
+
 function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
   const rc = ROLE_COLORS[position?.colorIdx || 0];
   const [recording, setRecording] = useState(false);
@@ -1050,6 +1085,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
               </div>
             ))}
           </div>
+          <ConditionsCard candidate={candidate} onUpdate={onUpdate} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${liveScore ? `${sc(liveScore.liveScore)}50` : C.border}`, padding: 20, transition: "border-color .5s" }}>
@@ -1842,6 +1878,7 @@ export default function HireL() {
           stage: c.stage || "서류검토",
           starred: !!c.starred,
           portfolioCheck: c.portfolioCheck || null,
+          conditions: c.conditions || null,
           fileNames: c.fileNames || [],
           fileRefs: c.fileRefs || [],
           manualScores: c.manualScores || null,
@@ -2103,6 +2140,7 @@ export default function HireL() {
           stage: c.stage || "서류검토",
           starred: !!c.starred,
           portfolioCheck: c.portfolioCheck || null,
+          conditions: c.conditions || null,
           fileRefs: c.fileRefs || [],
           manualScores: c.manualScores || null,
           manualTotal: c.manualScores ? v2WeightedTotal(c.manualScores) : null,
@@ -2479,6 +2517,9 @@ export default function HireL() {
                   <div style={{ marginBottom: 18 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>📎 첨부 자료 <span style={{ fontWeight: 400, color: C.muted }}>· 원본은 사내 폴더 보관, 여기엔 경로만</span></div>
                     <FileRefsSection candidate={c} onUpdate={fr => updateCandidate(c.id, { fileRefs: fr })} showToast={showToast} />
+                    <div style={{ marginTop: 12 }}>
+                      <ConditionsCard candidate={c} onUpdate={patch => updateCandidate(c.id, patch)} />
+                    </div>
                   </div>
                   {a && !busy && (
                     <div style={{ marginBottom: 18 }}>
