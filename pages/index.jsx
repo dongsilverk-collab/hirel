@@ -1343,48 +1343,53 @@ const CAREER_BUILTIN = {
   "오세현": {
     header: "표기 6년 — ⚠ 최근 3개사 연속 단기",
     rows: [
-      { company: "오비랩(OviLab)", role: "Growth & Tech Lead", period: "2025.06~2026.02", dur: "9개월 ⚠" },
+      { company: "오비랩(OviLab)", role: "Growth & Tech Lead", period: "2025.06~2026.02", dur: "9개월 ⚠", work: "AI 소재 제작(CTR 2.5배)·ROAS 1,928%·광고비 -63%, 리뷰 1만건 마이닝→카피, 로컬 LLM 에이전트 자작" },
       { gap: true, label: "공백 2026.02~ 현재 6개월 (퇴사 후)" },
       { gap: true, label: "공백 2025.03~2025.06 · 3개월" },
-      { company: "비오스드림", role: "Growth Marketing Lead", period: "2024.02~2025.03", dur: "1년 1개월" },
-      { company: "아이마이미마인(IMYMEMINE)", role: "Commerce Operation Manager", period: "2023.10~2024.02", dur: "5개월 ⚠" },
-      { company: "대한금융지원센터", role: "Digital Marketer", period: "2019.11~2023.10", dur: "4년 ★" },
+      { company: "비오스드림", role: "Growth Marketing Lead", period: "2024.02~2025.03", dur: "1년 1개월", work: "B2B→D2C 피봇 주도(매출 12배 주장 — 수치 검증 필요), 테크니컬 SEO 인프라, CRM 리텐션 루프" },
+      { company: "아이마이미마인(IMYMEMINE)", role: "Commerce Operation Manager", period: "2023.10~2024.02", dur: "5개월 ⚠", work: "고관여 커머스 운영 — BigQuery 퍼널 분석으로 상세페이지 이탈 95% 병목 발견→CVR 2.5배" },
+      { company: "대한금융지원센터", role: "Digital Marketer", period: "2019.11~2023.10", dur: "4년 ★", work: "디지털 마케팅 — GA4·SQL 데이터 리드 확보, 반복 리포팅 100% 자동화" },
     ],
     note: "안정 근속은 첫 회사 4년뿐. 이후 5개월→1년1개월→9개월 반복 — 면접 검증 1순위",
   },
   "박현철": {
     header: "총 9년 (8개사) — ⚠ 단기 3회 + 현직 7개월째 이직 시도",
     rows: [
-      { company: "Anti-aging Club", role: "팀장 / 헬스케어", period: "2025.11~재직중", dur: "7개월" },
-      { company: "(주)버핏서울", role: "영업기획실 / 마케팅 PM", period: "2022.09~2025.11", dur: "3년 3개월 ★" },
-      { company: "Biginsight", role: "팀장 / Adops", period: "2022.05~2022.08", dur: "4개월 ⚠" },
-      { company: "taggers.io", role: "Business Group Leader", period: "2020.07~2022.05", dur: "1년 11개월" },
-      { company: "(주)세븐헌드레드", role: "캠페인팀 대리", period: "2020.04~2020.06", dur: "3개월 ⚠" },
-      { company: "(주)에코마케팅", role: "계약직 / 구글전문그룹", period: "2019.05~2019.11", dur: "7개월" },
-      { company: "HS애드 · 한컴", role: "인턴 2회", period: "2014.03~2015.06", dur: "8개월·4개월" },
+      { company: "Anti-aging Club", role: "팀장 / 헬스케어", period: "2025.11~재직중", dur: "7개월", work: "헬스케어 브랜드 마케팅 총괄 — 광고→상담→재방문 풀퍼널, 의료광고 심의 리스크 대응, Moloco 테스트" },
+      { company: "(주)버핏서울", role: "영업기획실 / 마케팅 PM", period: "2022.09~2025.11", dur: "3년 3개월 ★", work: "월 1억+ 셀프서브 직접 운영, 분기 매출 목표 7회 초과, CAC/LTV·코호트·UTM 체계 구축" },
+      { company: "Biginsight", role: "팀장 / Adops", period: "2022.05~2022.08", dur: "4개월 ⚠", work: "광고 운영(Adops) 팀장" },
+      { company: "taggers.io", role: "Business Group Leader", period: "2020.07~2022.05", dur: "1년 11개월", work: "광고 CRM SaaS — 솔루션 기획·상품 세일즈·어카운트 매니징 총괄" },
+      { company: "(주)세븐헌드레드", role: "캠페인팀 대리", period: "2020.04~2020.06", dur: "3개월 ⚠", work: "광고 캠페인 운영" },
+      { company: "(주)에코마케팅", role: "계약직 / 구글전문그룹", period: "2019.05~2019.11", dur: "7개월", work: "구글 광고 전문그룹 — 월 30억 규모 대행 구조 경험" },
+      { company: "HS애드 · 한컴", role: "인턴 2회", period: "2014.03~2015.06", dur: "8개월·4개월", work: "광고 대행 인턴 (MMS·캠페인)" },
     ],
     note: "버핏서울 3년3개월(분기 목표 7회 초과)이 유일한 장기. 3·4·7개월 단기 사유를 개별 확인",
   },
   "이찬우": {
     header: "6년 (마케팅 실질 약 6년 3개월) — ✅ 4인 중 근속 최상",
     rows: [
-      { company: "앨트웰(주)", role: "마케팅 (건기식·생활용품·다이어트)", period: "2023.03~재직중", dur: "3년 6개월 ★" },
+      { company: "앨트웰(주)", role: "마케팅 (건기식·생활용품·다이어트)", period: "2023.03~재직중", dur: "3년 6개월 ★", work: "프로모션 기획~손익·매출 분석(누적 28.31억), 교육·홍보 영상 200편+, 오픈톡·밴드 커뮤니티 운영, AI 소재 실무 적용" },
       { gap: true, label: "공백 2022.07~2023.03 · 8개월" },
-      { company: "(주)앤알커뮤니케이션", role: "마케팅기획 (화장품·이너뷰티)", period: "2019.11~2022.07", dur: "2년 9개월" },
-      { company: "(주)삼구아이앤씨", role: "유지보수팀 (비마케팅)", period: "2018.03~2019.06", dur: "1년 4개월" },
-      { company: "(주)엘지유플러스", role: "영업 (비마케팅)", period: "2014.11~2016.11", dur: "2년 1개월" },
+      { company: "(주)앤알커뮤니케이션", role: "마케팅기획 (화장품·이너뷰티)", period: "2019.11~2022.07", dur: "2년 9개월", work: "신규 사업 TF — 카페·숙박 그랜드 오픈 이벤트, 인플루언서·리뷰 110건+ 유치, 동종업계 정기 리포트 24회+" },
+      { company: "(주)삼구아이앤씨", role: "유지보수팀 (비마케팅)", period: "2018.03~2019.06", dur: "1년 4개월", work: "SK하이닉스 협력사 — 반도체 장비 유지보수" },
+      { company: "(주)엘지유플러스", role: "영업 (비마케팅)", period: "2014.11~2016.11", dur: "2년 1개월", work: "유·무선 영업, 회원 보상플랜 개정 TFT" },
     ],
     note: "마케팅 경력 전체가 2~3년대 안정 근속. 공백 8개월(2022)만 확인",
   },
   "박보현": {
     header: "3년 (3개사) — 모두 1년 이상, 조기 이탈 패턴 없음",
     rows: [
-      { company: "Treasurer", role: "IMC 마케팅·서비스기획", period: "2024.12~재직중", dur: "1년 8개월" },
-      { company: "NextPaper M&C", role: "디지털 마케팅", period: "2023.03~2024.12", dur: "1년 10개월" },
-      { company: "FROMHERAS", role: "전략기획", period: "2022.02~2023.03", dur: "1년 1개월" },
+      { company: "Treasurer", role: "IMC 마케팅·서비스기획", period: "2024.12~재직중", dur: "1년 8개월", work: "온보딩~리텐션 퍼널 재정의, RFM·K-Means 세그먼트, SQL·Looker 대시보드, Make·n8n 자동화" },
+      { company: "NextPaper M&C", role: "디지털 마케팅", period: "2023.03~2024.12", dur: "1년 10개월", work: "디지털 IMC 전략·Paid Media, SEO/SEM, 세타필(더마) 캠페인 운영" },
+      { company: "FROMHERAS", role: "전략기획", period: "2022.02~2023.03", dur: "1년 1개월", work: "수입·물류 ERP 구축, 상품·서비스 기획" },
     ],
     note: "연차는 짧지만 근속 리듬은 건강. 직전·현직 연속(이직 준비 겹침 여부만 확인)",
   },
+};
+// 회사명 → 사람인 기업정보 검색 (재무 정보는 검색 결과에서 회사 클릭 → 기업정보·재무 탭)
+const saraminCompanyUrl = (name) => {
+  const clean = (name || "").replace(/\(주\)|㈜/g, "").split("(")[0].split("·")[0].trim();
+  return clean ? `https://www.saramin.co.kr/zf_user/search/company?searchword=${encodeURIComponent(clean)}` : null;
 };
 function InterviewResumeCard({ candidate }) {
   const [copied, setCopied] = useState(null);
@@ -1414,7 +1419,13 @@ function InterviewResumeCard({ candidate }) {
               <tr key={i}><td colSpan={3} style={{ ...cell, color: C.amber, fontStyle: "italic", fontSize: 10.5 }}>… {r.label}</td></tr>
             ) : (
               <tr key={i}>
-                <td style={cell}><div style={{ fontWeight: 700, fontSize: 12 }}>{r.company}</div>{r.role && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 1 }}>{r.role}</div>}</td>
+                <td style={cell}>
+                  {saraminCompanyUrl(r.company)
+                    ? <a href={saraminCompanyUrl(r.company)} target="_blank" rel="noreferrer" title="사람인 기업정보(재무·연봉) 검색으로 열기" style={{ fontWeight: 700, fontSize: 12, color: C.accent, textDecoration: "none" }}>{r.company} ↗</a>
+                    : <span style={{ fontWeight: 700, fontSize: 12 }}>{r.company}</span>}
+                  {r.role && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 1 }}>{r.role}</div>}
+                  {r.work && <div style={{ fontSize: 10.5, color: C.sub, marginTop: 3, lineHeight: 1.5 }}>{r.work}</div>}
+                </td>
                 <td style={{ ...cell, textAlign: "center", fontSize: 10.5, whiteSpace: "nowrap", color: C.sub }}>{r.period}</td>
                 <td style={{ ...cell, textAlign: "center" }}>{(() => {
                   const mo = durMonths(r.dur);
@@ -3233,6 +3244,8 @@ export default function HireL() {
                       </div>
                     )}
                     {activeTab === "resume" && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <InterviewResumeCard candidate={c} />
                       <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 24 }}>
                         <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>제출된 이력서</h3>
                         {c.fileNames?.length > 0 && <div style={{ marginBottom: 14, display: "flex", gap: 7, flexWrap: "wrap" }}>
@@ -3246,6 +3259,7 @@ export default function HireL() {
                         </div>}
                         {c.resume ? <pre style={{ fontSize: 13, color: C.sub, lineHeight: 1.8, whiteSpace: "pre-wrap", margin: 0, fontFamily: "inherit" }}>{c.resume}</pre>
                           : <div style={{ color: C.muted, fontSize: 13, padding: "16px 0" }}>📄 파일 업로드로 분석됨</div>}
+                      </div>
                       </div>
                     )}
                   </>)}
