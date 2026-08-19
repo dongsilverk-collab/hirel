@@ -27,8 +27,8 @@ const ROLE_COLORS = [
 ];
 
 // ─── 지원 채널 ────────────────────────────────────────────────────────────────
-const CHANNELS = ["사람인", "잡코리아", "그룹바이", "원티드", "직접지원", "기타"];
-const CHANNEL_COLORS = { 사람인: "#2563EB", 잡코리아: "#4F46E5", 그룹바이: "#059669", 원티드: "#0284C7", 직접지원: "#7C3AED", 기타: "#6B7280" };
+const CHANNELS = ["사람인", "잡코리아", "그룹바이", "원티드", "리퍼럴", "직접지원", "기타"];
+const CHANNEL_COLORS = { 사람인: "#2563EB", 잡코리아: "#4F46E5", 그룹바이: "#059669", 원티드: "#0284C7", 리퍼럴: "#DB2777", 직접지원: "#7C3AED", 기타: "#6B7280" };
 function ChannelBadge({ channel, small }) {
   const ch = CHANNELS.includes(channel) ? channel : "기타";
   const col = CHANNEL_COLORS[ch];
@@ -939,6 +939,213 @@ function QuestionScoreSummary({ candidate, title }) {
   );
 }
 
+// ─── EVP 오프닝 대본 카드 (트레이드오프 선언문 + 어트랙션 멘트) ─────────────
+const EVP_TRADEOFF = [
+  "시작 전에 저희 조건을 먼저 말씀드리겠습니다. 세 가지입니다.",
+  "하나, 3개월 계약 후 정규 전환 구조입니다. 서로를 검증하는 기간이고, 판단 기준은 입사 첫날 문서로 드립니다.",
+  "둘, 마케팅팀은 팀원이 0명입니다. 본인이 1호이고, 처음엔 손이 많이 가는 실무의 자리입니다.",
+  "셋, 연봉 상한은 5,500입니다. 시장 최고 대우는 아닙니다.",
+  "이 세 가지를 듣고도 흥미가 있으시면, 저희가 드릴 수 있는 것을 말씀드리겠습니다.",
+];
+const EVP_ATTRACTION = [
+  "저희 고객은 암 환우와 그 가족입니다. 마케팅 메시지 하나가 실제로 누군가의 회복기 식탁을 바꿉니다.",
+  "이 자리는 1호 마케터입니다. 결재 라인 없이 대표와 바로 일하고, 성과를 내면 팀은 본인을 중심으로 만들어집니다.",
+  "AI 소재 생성·리뷰 마이닝·자동 리포팅까지 툴은 저희가 만들어 두고 있습니다. 실무자가 잡무에 시간을 쓰지 않게 하는 게 대표인 제 일입니다.",
+];
+function EvpScriptCard() {
+  const [open, setOpen] = useState("tradeoff"); // "tradeoff" | "attraction" | null
+  const sec = (key, icon, title, when, lines, color) => (
+    <div style={{ marginBottom: open === key ? 10 : 4 }}>
+      <div onClick={() => setOpen(p => p === key ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "7px 10px", background: `${color}10`, border: `1px solid ${color}30`, borderRadius: 8 }}>
+        <span style={{ fontSize: 12.5, fontWeight: 700, color }}>{icon} {title}</span>
+        <span style={{ fontSize: 10.5, color: C.muted }}>{when}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: C.muted }}>{open === key ? "▲ 접기" : "▼ 대본 보기"}</span>
+      </div>
+      {open === key && (
+        <div style={{ padding: "10px 12px", borderLeft: `3px solid ${color}`, margin: "6px 0 0 4px" }}>
+          {lines.map((l, i) => <p key={i} style={{ fontSize: 13, color: C.text, lineHeight: 1.7, margin: "0 0 7px 0" }}>&ldquo;{l}&rdquo;</p>)}
+        </div>
+      )}
+    </div>
+  );
+  return (
+    <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 8 }}>🗣 EVP 오프닝 대본 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· 숨기면 입사 후 터진다 — 먼저 밝히면 기대 관리</span></div>
+      {sec("tradeoff", "⚖️", "트레이드오프 선언문", "면접 시작 직후 그대로 읽기 · 반응은 킷 1번 질문에 판정", EVP_TRADEOFF, C.amber)}
+      {sec("attraction", "✨", "어트랙션 멘트", "면접 마무리 5분 · 후보 유형별 강조(실무형→전권·속도 / 미션형→환우 / 성장형→팀 빌딩)", EVP_ATTRACTION, C.accent)}
+    </div>
+  );
+}
+
+// ─── 온보딩 모드 (합격자 3개월 추적: 돕는 기간 + 검증하는 기간) ────────────────
+// 원본 문서: Y:\본부\인사\마케터채용\온보딩_킷.md
+const OB_MILESTONES = [
+  ["d1_doc", "기대치 문서 합의 — 역할·3개월 기대 수준·전환 기준을 문서로 같이 읽고 합의", "대표", 0, 2],
+  ["d1_setup", "계정·툴·행정 셋업 — 광고계정·자사몰 어드민·Y드라이브·급여/4대보험", "인사", 0, 3],
+  ["w1_daily", "Week 1 데일리 싱크 — 매일 15~30분 (오늘 한 일·막힌 것·내일 할 일)", "대표", 0, 9],
+  ["w2_rel", "관계 지도 미팅 — 상무·유튜브 담당·디자이너·인사 각 1회 연결", "인사", 3, 14],
+  ["w2_win", "'첫 작은 성공' 과제 완료 — 전환형: 소재 1건 라이브 / 광고운영: 계정 감사 / CRM: 세그먼트 1개 실행", "대표", 7, 18],
+  ["m1_retro", "Month 1 회고 60~90분 — 기대 vs 실행 갭 확인, 배우는 속도 판단 (아래 회고 탭 기록)", "대표+인사", 25, 38],
+  ["m2_auto", "Month 2 자율성 이양 — 주 1회 60분 전환 + ⚠ Gray Area 신호는 반드시 이 시점에 포착", "대표", 35, 58],
+  ["m2_retro", "Month 2 회고 — 전환 판단 예고 (판단 기준 재고지)", "대표+인사", 55, 68],
+  ["m3_judge", "Month 3 첫 주 전환 판단 — 3축 채점 + 최종 질문 (만료 2주 전 통보 여유 확보)", "대표+인사", 60, 75],
+];
+const OB_RETROS = [["m1", "Month 1 회고"], ["m2", "Month 2 회고"], ["m3", "Month 3 회고 (전환 전 최종)"]];
+const OB_AXES = [
+  ["competence", "역량", "기대치 문서의 Month1~3 기대 수준을 실물로 달성했는가"],
+  ["culture", "컬처핏", "기대 행동(나쁜 소식 먼저·24시간 내 도움 요청·고객 중심·2주 실험)을 사례로 적을 수 있는가"],
+  ["growth", "성장 속도", "같은 피드백을 반복하게 했는가 — 피드백 후 행동이 바뀌었는가"],
+];
+const OB_VERDICTS = [["convert", "✅ 전환 확정", "#059669"], ["part", "🤝 이별 (관대한 조건)", "#64748B"], ["gray", "⚠ 애매 → 전환하지 않음", "#D97706"]];
+function obDays(startDate) {
+  if (!startDate) return null;
+  const d = Math.floor((Date.now() - new Date(startDate + "T00:00:00").getTime()) / 86400000);
+  return d < 0 ? null : d;
+}
+function OnboardingView({ candidates, positions, onUpdate }) {
+  const list = candidates.filter(c => c.onboarding || ["합격", "처우협의"].includes(c.stage));
+  const [selId, setSelId] = useState(null);
+  const c = list.find(x => x.id === selId) || list[0];
+  const ob = c?.onboarding || {};
+  const patch = (p) => c && onUpdate(c.id, { onboarding: { ...ob, ...p } });
+  const day = obDays(ob.startDate);
+  const msState = (m) => {
+    const [key, , , start, due] = m;
+    const done = ob.milestones?.[key]?.done;
+    if (done) return "done";
+    if (day == null) return "upcoming";
+    if (day > due) return "overdue";
+    if (day >= start) return "current";
+    return "upcoming";
+  };
+  const doneN = OB_MILESTONES.filter(m => ob.milestones?.[m[0]]?.done).length;
+  const overdueN = OB_MILESTONES.filter(m => msState(m) === "overdue").length;
+  const toggleMs = (key) => {
+    const cur = ob.milestones?.[key]?.done;
+    patch({ milestones: { ...(ob.milestones || {}), [key]: cur ? { done: false } : { done: true, at: Date.now() } } });
+  };
+  const setRetro = (rk, field, val) => patch({ retros: { ...(ob.retros || {}), [rk]: { ...(ob.retros?.[rk] || {}), [field]: val, at: Date.now() } } });
+  const setTr = (p) => patch({ transition: { ...(ob.transition || {}), ...p, at: Date.now() } });
+  const tr = ob.transition || {};
+  const TA = (v, ph, onBlur, rows) => (
+    <textarea defaultValue={v || ""} placeholder={ph} rows={rows || 3} onBlur={e => onBlur(e.target.value)}
+      style={{ width: "100%", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "8px 11px", fontSize: 12.5, outline: "none", fontFamily: "inherit", boxSizing: "border-box", resize: "vertical", lineHeight: 1.6 }} />
+  );
+  const OWNER_COL = { "대표": C.accent, "인사": C.pink, "대표+인사": C.purple };
+  if (!list.length) return (
+    <div style={{ textAlign: "center", padding: "70px 0", color: C.muted }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>🌱</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: C.sub }}>온보딩 대상이 없습니다</div>
+      <div style={{ fontSize: 12.5, marginTop: 6 }}>보드에서 후보를 <b>처우협의</b> 또는 <b>합격</b> 단계로 이동하면 여기에 나타납니다.<br />온보딩은 돕는 기간이자 검증하는 기간 — 합격 통보 전에 시작 준비를 마치세요.</div>
+    </div>
+  );
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {list.map(x => {
+          const on = x.id === c.id;
+          const xd = obDays(x.onboarding?.startDate);
+          return (
+            <button key={x.id} onClick={() => setSelId(x.id)} style={{ padding: "8px 14px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", background: on ? C.glow : C.card, border: `1px solid ${on ? C.accent : C.border}`, color: on ? C.accent : C.sub, fontSize: 13, fontWeight: on ? 700 : 500 }}>
+              {x.name} {xd != null ? `· D+${xd}` : "· 시작 전"}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 18, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>{c.name} <span style={{ fontSize: 12, fontWeight: 500, color: C.muted }}>{positions.find(p => p.id === c.positionId)?.name || ""}</span></div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>온보딩 = 돕는 기간 + 검증하는 기간 · 애매하면 전환하지 않는다</div>
+          </div>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <label style={{ fontSize: 12, color: C.sub }}>입사일{" "}
+              <input type="date" value={ob.startDate || ""} onChange={e => patch({ startDate: e.target.value })}
+                style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, padding: "6px 9px", fontSize: 12.5, fontFamily: "inherit", outline: "none" }} />
+            </label>
+            {day != null && <span style={{ fontSize: 16, fontWeight: 800, color: C.accent, fontFamily: "'DM Mono',monospace" }}>D+{day}</span>}
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.green }}>진행 {doneN}/{OB_MILESTONES.length}</span>
+            {overdueN > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: C.red, background: "#FEF2F2", border: `1px solid ${C.red}40`, padding: "3px 10px", borderRadius: 12 }}>⚠ 지연 {overdueN}건 — 인사팀 확인 필요</span>}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 10 }}>📍 3개월 마일스톤 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· 지연(빨강)은 그 주에 반드시 해소</span></div>
+            {OB_MILESTONES.map(m => {
+              const [key, label, owner] = m;
+              const st = msState(m);
+              const col = st === "done" ? C.green : st === "overdue" ? C.red : st === "current" ? C.accent : C.muted;
+              return (
+                <div key={key} onClick={() => toggleMs(key)} style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: st === "overdue" ? "#FEF2F2" : st === "current" ? C.glow : "transparent", border: `1px solid ${st === "overdue" ? `${C.red}40` : st === "current" ? `${C.accent}30` : "transparent"}`, marginBottom: 4 }}>
+                  <span style={{ fontSize: 15, lineHeight: "18px" }}>{st === "done" ? "✅" : st === "overdue" ? "🔴" : "⬜"}</span>
+                  <span style={{ flex: 1, fontSize: 12.5, color: st === "done" ? C.muted : C.text, lineHeight: 1.55, textDecoration: st === "done" ? "line-through" : "none" }}>{label}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: OWNER_COL[owner] || C.muted, background: `${OWNER_COL[owner] || C.muted}15`, padding: "2px 7px", borderRadius: 8, whiteSpace: "nowrap" }}>{owner}</span>
+                  {st === "overdue" && <span style={{ fontSize: 10, fontWeight: 800, color: C.red, whiteSpace: "nowrap" }}>지연</span>}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 4 }}>📄 기대치 문서 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· Day 1에 같이 읽고 합의 — 입력하면 자동 저장</span></div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>기대(리더 작성)는 여기, 실행 계획은 본인이 Week1 안에 회신 — 갭을 첫 주에 가시화</div>
+            {TA(ob.expectations?.role, "역할·책임: 이 자리의 미션 / 업무 비율 / 하지 않는 일 (예: 소재 40%·매체 30%·콘텐츠 30%, 팀 관리는 없음)", v => patch({ expectations: { ...(ob.expectations || {}), role: v } }))}
+            <div style={{ height: 6 }} />
+            {TA(ob.expectations?.m1, "Month 1 기대: 예) 온보딩 완료 + 소재 4건 라이브 + 기존 계정 구조 파악", v => patch({ expectations: { ...(ob.expectations || {}), m1: v } }), 2)}
+            <div style={{ height: 6 }} />
+            {TA(ob.expectations?.m2, "Month 2 기대: 예) 본인 가설로 소재-성과 루프 1사이클 완주, 수치 보고", v => patch({ expectations: { ...(ob.expectations || {}), m2: v } }), 2)}
+            <div style={{ height: 6 }} />
+            {TA(ob.expectations?.m3, "Month 3 기대: 예) 주력 채널 1개를 개입 없이 운영 → 전환 판단", v => patch({ expectations: { ...(ob.expectations || {}), m3: v } }), 2)}
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {OB_RETROS.map(([rk, label]) => {
+            const r = ob.retros?.[rk] || {};
+            const filled = r.leader || r.self || r.actions;
+            return (
+              <div key={rk} style={{ background: C.card, borderRadius: 13, border: `1px solid ${filled ? `${C.green}50` : C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 8 }}>🗓 {label} {filled && <span style={{ fontSize: 11, color: C.green, fontWeight: 700 }}>✓ 기록됨</span>}</div>
+                {TA(r.leader, "리더: ① 잘하고 있는 것(사례) ② 더 잘할 수 있는 것(사례) ③ 다음 달 새로 시도할 것", v => setRetro(rk, "leader", v))}
+                <div style={{ height: 6 }} />
+                {TA(r.self, "본인: ① 스스로의 회고 ② 도움이 필요한 것(사람·권한·도구) ③ 회사·리더에게 요청", v => setRetro(rk, "self", v))}
+                <div style={{ height: 6 }} />
+                {TA(r.actions, "합의한 액션 아이템: 누가 / 무엇을 / 언제까지 (+ 다음 달 기대 수준 조정)", v => setRetro(rk, "actions", v), 2)}
+              </div>
+            );
+          })}
+          <div style={{ background: C.card, borderRadius: 13, border: `2px solid ${tr.verdict ? (OB_VERDICTS.find(v => v[0] === tr.verdict)?.[2] || C.border) : C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 3 }}>⚖️ Month 3 전환 판단 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· Month 3 첫 주에 — 만료 직전이면 늦다</span></div>
+            <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10 }}>최종 질문: &ldquo;이 사람에게 광고비와 브랜드를 믿고 맡기는 모습이 상상되는가?&rdquo;</div>
+            {OB_AXES.map(([ak, label, desc]) => (
+              <div key={ak} style={{ marginBottom: 9 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>{label}</span>
+                  <span style={{ fontSize: 10.5, color: C.muted, flex: 1 }}>{desc}</span>
+                </div>
+                <div style={{ display: "flex", gap: 5 }}>
+                  {[1, 2, 3, 4, 5].map(n => {
+                    const on = tr[ak] != null && n <= tr[ak];
+                    return <button key={n} onClick={() => setTr({ [ak]: tr[ak] === n ? null : n })} style={{ width: 30, height: 26, borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: on ? C.accent : C.surface, border: `1px solid ${on ? C.accent : C.borderL}`, color: on ? "#fff" : C.sub }}>{n}</button>;
+                  })}
+                </div>
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "12px 0 8px" }}>
+              {OB_VERDICTS.map(([vk, label, col]) => {
+                const on = tr.verdict === vk;
+                return <button key={vk} onClick={() => setTr({ verdict: on ? null : vk })} style={{ padding: "8px 13px", borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: on ? col : C.surface, border: `1px solid ${on ? col : C.borderL}`, color: on ? "#fff" : C.sub }}>{label}</button>;
+              })}
+            </div>
+            {tr.verdict === "gray" && <div style={{ fontSize: 11.5, fontWeight: 700, color: "#D97706", marginBottom: 8 }}>⚠ Gray Area 룰: &lsquo;3개월 더 보자&rsquo;는 결정 회피 — 전환하지 않는 것이 원칙 (관대한 조건으로 이별)</div>}
+            {TA(tr.note, "판단 근거 메모: 어떤 사례·기록이 이 판정을 뒷받침하는가", v => setTr({ note: v }), 2)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Interview Room ───────────────────────────────────────────────────────────
 // ─── 면접 조건 기록 (입사 가능 시기·희망 연봉) ─────────────────────────────
 const START_PRESETS = ["즉시", "2주 이내", "1개월 이내", "협의 필요"];
@@ -1138,6 +1345,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 370px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <EvpScriptCard />
           <GrayAreaBanner candidate={candidate} />
           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -2007,6 +2215,7 @@ export default function HireL() {
           manualScoredAt: c.manualScoredAt || null,
           questionScores: c.questionScores || null,
           customQuestions: c.customQuestions || null,
+          onboarding: c.onboarding || null,
           resume: (c.resume||"").slice(0, 300),
           files: [],
           analysis: c.analysis ? {
@@ -2267,6 +2476,7 @@ export default function HireL() {
           manualTotal: c.manualScores ? v2WeightedTotal(c.manualScores) : null,
           manualScoredBy: c.manualScoredBy || null,
           questionScores: c.questionScores || null,
+          onboarding: c.onboarding || null,
           analysisScore: v2 ? v2WeightedTotal(v2) : (c.analysis?.totalScore ?? null),
           aiVerdict: fb?.aiVerdict || c.analysis?.verdict || null,
           finalDecision: c.finalDecision?.result || null,
@@ -2366,7 +2576,7 @@ export default function HireL() {
             <span style={{ fontSize: 10, color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: "2px 7px", borderRadius: 18 }}>BETA</span>
           </div>
           <div style={{ display: "flex", gap: 3 }}>
-            {[["dashboard", "◫ 대시보드"], ["board", "▦ 보드"], ["library", "🗂 자료실"], ["detail", "◉ 상세 분석"], ["report", "📊 채용 리포트"]].map(([v, l]) => (
+            {[["dashboard", "◫ 대시보드"], ["board", "▦ 보드"], ["library", "🗂 자료실"], ["detail", "◉ 상세 분석"], ["report", "📊 채용 리포트"], ["onboarding", "🌱 온보딩"]].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)} style={{ padding: "5px 14px", borderRadius: 7, border: "none", fontSize: 13, fontWeight: 500, background: view === v ? C.glow : "transparent", color: view === v ? C.accent : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{l}</button>
             ))}
           </div>
@@ -2461,6 +2671,9 @@ export default function HireL() {
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 28px" }}>
         {view === "report" && (
           <ReportView candidates={candidates} positions={positions} onExport={() => exportRecruitmentReport(candidates, positions)} />
+        )}
+        {view === "onboarding" && (
+          <OnboardingView candidates={candidates} positions={positions} onUpdate={updateCandidate} />
         )}
         {view === "library" && (
           <LibraryView candidates={filteredCandidates} positions={positions} onSelect={(id) => { setSelectedCandidateId(id); setActiveTab("overview"); setView("detail"); }} onToggleStar={toggleStar} />
