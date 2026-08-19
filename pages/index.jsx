@@ -981,15 +981,31 @@ function EvpScriptCard() {
 // 원본 문서: Y:\본부\인사\마케터채용\온보딩_킷.md
 const OB_MILESTONES = [
   ["d1_doc", "기대치 문서 합의 — 역할·3개월 기대 수준·전환 기준을 문서로 같이 읽고 합의", "대표", 0, 2],
-  ["d1_setup", "계정·툴·행정 셋업 — 광고계정·자사몰 어드민·Y드라이브·급여/4대보험", "인사", 0, 3],
+  ["d1_card35", "35CARD 작성·리뷰 미팅 — 3대 과업·5대 해결과제 합의 (입사 첫날 11시, 상무)", "대표+인사", 0, 3],
+  ["d1_setup", "계정·툴·행정 셋업 + 웰컴키트·근로계약서·보안서약서 (입사 첫날 시간표)", "인사", 0, 3],
   ["w1_daily", "Week 1 데일리 싱크 — 매일 15~30분 (오늘 한 일·막힌 것·내일 할 일)", "대표", 0, 9],
   ["w2_rel", "관계 지도 미팅 — 상무·유튜브 담당·디자이너·인사 각 1회 연결", "인사", 3, 14],
   ["w2_win", "'첫 작은 성공' 과제 완료 — 전환형: 소재 1건 라이브 / 광고운영: 계정 감사 / CRM: 세그먼트 1개 실행", "대표", 7, 18],
-  ["m1_retro", "Month 1 회고 60~90분 — 기대 vs 실행 갭 확인, 배우는 속도 판단 (아래 회고 탭 기록)", "대표+인사", 25, 38],
+  ["m1_retro", "Month 1 회고 60~90분 — 35CARD 기반 1:1 (과업·과제 진척 + 기대 vs 실행 갭)", "대표+인사", 25, 38],
   ["m2_auto", "Month 2 자율성 이양 — 주 1회 60분 전환 + ⚠ Gray Area 신호는 반드시 이 시점에 포착", "대표", 35, 58],
-  ["m2_retro", "Month 2 회고 — 전환 판단 예고 (판단 기준 재고지)", "대표+인사", 55, 68],
-  ["m3_judge", "Month 3 첫 주 전환 판단 — 3축 채점 + 최종 질문 (만료 2주 전 통보 여유 확보)", "대표+인사", 60, 75],
+  ["m2_retro", "Month 2 회고 — 35CARD 기반 1:1 + 전환 판단 예고 (판단 기준 재고지)", "대표+인사", 55, 68],
+  ["m3_judge", "Month 3 첫 주 전환 판단 — 3축 채점 + 최종 질문 → 셀프 리더십 PT로 수료", "대표+인사", 60, 75],
 ];
+// ─── 35CARD: 3대 과업 + 5대 해결과제 (입사 첫날 작성 → 월 1회 1:1 미팅의 기준 문서) ──
+const C35_MARKETER_TEMPLATE = {
+  tasks: [
+    { role: "퍼포먼스 마케팅 및 광고 콘텐츠 운영", detail: "메타·네이버 GFA·클립·토스·틱톡 등 채널별 특성에 맞는 광고 콘텐츠를 기획·제작하고, 소구점별 A/B 테스트와 지표 기반 예산 조정으로 ROAS 지속 개선" },
+    { role: "인플루언서·체험단·서포터즈 운영 (소스 확보 허브)", detail: "건강·웰니스·암환우 분야 인플루언서 시딩·공동구매, 레뷰 체험단(베지셀·그린진·숨촉촉)·서포터즈(월 10명)로 후기·UGC 상시 확보 → 광고 소재·상세페이지·매거진 재활용" },
+    { role: "온드미디어 운영 및 브랜드 스토리텔링", detail: "인스타그램 정기 운영, 블로그·자사몰 매거진에 암환자·보호자가 신뢰할 스토리텔링 콘텐츠 발행, 자사몰 프로모션 기획으로 유입→구매·상담 전환" },
+  ],
+  goals: [
+    { title: "광고 채널별 고효율 소재 체계 구축 (메타·GFA·클립·토스·틱톡)", vision: "채널별 검증된 소재 포맷 확보, 주력 캠페인 ROAS 손익분기 안정 상회, 저효율 소재 정리 루틴 정착", idea: "채널별 소재 차별화(숏폼 후킹/신뢰형 배너/혜택형) → A/B 테스트 → 예산 재배분. 심의 가이드 준수", when: "입사 ~ 1개월" },
+    { title: "레뷰 체험단 정례화 (베지셀·그린진·숨촉촉)", vision: "3개 제품 체험단 월 단위 정례화, 네이버 검색 구좌를 자사 후기가 점유", idea: "제품별 캘린더 → 모집·선정·가이드 프로세스화 → 핵심 키워드 선점형 후기 → 우수 후기 재활용", when: "1~2개월" },
+    { title: "서포터즈·인플루언서 소스 파이프라인 구축", vision: "서포터즈 월 10명 안착, UGC 상시 생산, 소스가 광고·매거진·상세페이지로 재활용되는 선순환", idea: "리워드+자율성 설계 → 검증 인플루언서 풀 → 시딩(인지)·공구(매출) 단계 연계", when: "1~3개월" },
+    { title: "자사몰 프로모션 기획·운영", vision: "큐라엘몰 월별 프로모션 정례화, 유입→구매 전환·객단가·재구매율 개선", idea: "시즌·출시 연계 캘린더 → 참여형 이벤트·혜택 설계 → 상세페이지 A/B 연계 동선 최적화", when: "2~4개월" },
+    { title: "온드미디어·매거진 스토리텔링 체계화", vision: "'암환우 영양 관리는 큐라엘' 신뢰 포지션 형성, 검색·SNS 인지도 성장", idea: "콘텐츠 시리즈 기획(환우 식단 루틴 등) → 인스타=공감형/블로그·매거진=정보형 역할 분담 → 체험단 소스 재가공", when: "3~6개월 (지속)" },
+  ],
+};
 const OB_RETROS = [["m1", "Month 1 회고"], ["m2", "Month 2 회고"], ["m3", "Month 3 회고 (전환 전 최종)"]];
 const OB_AXES = [
   ["competence", "역량", "기대치 문서의 Month1~3 기대 수준을 실물로 달성했는가"],
@@ -1037,6 +1053,15 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
   const setRetro = (rk, field, val) => patch({ retros: { ...(ob.retros || {}), [rk]: { ...(ob.retros?.[rk] || {}), [field]: val, at: Date.now() } } });
   const setTr = (p) => patch({ transition: { ...(ob.transition || {}), ...p, at: Date.now() } });
   const tr = ob.transition || {};
+  const c35 = ob.card35 || {};
+  const setC35 = (p) => patch({ card35: { ...c35, ...p, at: Date.now() } });
+  const setC35Task = (i, f, v) => { const t = [...(c35.tasks || [{}, {}, {}])]; t[i] = { ...(t[i] || {}), [f]: v }; setC35({ tasks: t }); };
+  const setC35Goal = (i, f, v) => { const g = [...(c35.goals || [{}, {}, {}, {}, {}])]; g[i] = { ...(g[i] || {}), [f]: v }; setC35({ goals: g }); };
+  const loadC35Template = () => {
+    if ((c35.tasks || c35.goals) && !confirm("이미 작성된 35CARD가 있습니다. 마케터 기본 템플릿으로 덮어쓸까요?")) return;
+    setC35({ ...C35_MARKETER_TEMPLATE, tv: (c35.tv || 0) + 1 });
+  };
+  const INP = { width: "100%", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "7px 10px", fontSize: 12.5, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
   const TA = (v, ph, onBlur, rows) => (
     <textarea defaultValue={v || ""} placeholder={ph} rows={rows || 3} onBlur={e => onBlur(e.target.value)}
       style={{ width: "100%", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "8px 11px", fontSize: 12.5, outline: "none", fontFamily: "inherit", boxSizing: "border-box", resize: "vertical", lineHeight: 1.6 }} />
@@ -1081,7 +1106,7 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
           </div>
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+      <div key={c.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 10 }}>📍 3개월 마일스톤 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· 지연(빨강)은 그 주에 반드시 해소</span></div>
@@ -1109,6 +1134,40 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
             {TA(ob.expectations?.m2, "Month 2 기대: 예) 본인 가설로 소재-성과 루프 1사이클 완주, 수치 보고", v => patch({ expectations: { ...(ob.expectations || {}), m2: v } }), 2)}
             <div style={{ height: 6 }} />
             {TA(ob.expectations?.m3, "Month 3 기대: 예) 주력 채널 1개를 개입 없이 운영 → 전환 판단", v => patch({ expectations: { ...(ob.expectations || {}), m3: v } }), 2)}
+          </div>
+          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>🗂 35CARD</span>
+              <span style={{ fontSize: 11, color: C.muted, flex: 1 }}>· 입사 첫날 작성 → 월 1회 1:1 미팅의 기준 문서</span>
+              <button onClick={loadC35Template} style={{ padding: "4px 10px", borderRadius: 7, background: C.glow, border: `1px solid ${C.accent}40`, color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>마케터 템플릿 불러오기</button>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>3대 과업(역할 정의) + 5대 해결과제(90일 목표) — 본인과 같이 작성하고, 매월 회고에서 이 카드로 진척을 점검</div>
+            <div key={`c35-${c35.tv || 0}`}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 6 }}>3대 과업</div>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{ marginBottom: 8 }}>
+                  <input defaultValue={c35.tasks?.[i]?.role || ""} placeholder={`과업 ${i + 1} — 역할 (예: 퍼포먼스 마케팅 및 광고 콘텐츠 운영)`} onBlur={e => setC35Task(i, "role", e.target.value)} style={{ ...INP, fontWeight: 600, marginBottom: 4 }} />
+                  {TA(c35.tasks?.[i]?.detail, "핵심 내용 — 무엇을 어떻게 해서 어떤 지표를 움직이는가", v => setC35Task(i, "detail", v), 2)}
+                </div>
+              ))}
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, margin: "12px 0 6px" }}>5대 해결과제</div>
+              {[0, 1, 2, 3, 4].map(i => {
+                const g = c35.goals?.[i] || {};
+                return (
+                  <details key={i} style={{ marginBottom: 6, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 11px" }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: g.title ? C.text : C.muted }}>
+                      과제 {i + 1} · {g.title || "제목 미작성 — 펼쳐서 작성"} {g.when && <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 500 }}>({g.when})</span>}
+                    </summary>
+                    <div style={{ paddingTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
+                      <input defaultValue={g.title || ""} placeholder="제목" onBlur={e => setC35Goal(i, "title", e.target.value)} style={{ ...INP, fontWeight: 600 }} />
+                      {TA(g.vision, "달성되었을 때 모습 — 무엇이 어떻게 되어 있는가", v => setC35Goal(i, "vision", v), 2)}
+                      {TA(g.idea, "해결 아이디어 — 어떤 순서·방법으로", v => setC35Goal(i, "idea", v), 2)}
+                      <input defaultValue={g.when || ""} placeholder="시기 (예: 입사 ~ 1개월)" onBlur={e => setC35Goal(i, "when", e.target.value)} style={INP} />
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
