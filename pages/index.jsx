@@ -1338,13 +1338,20 @@ function durMonths(d) {
   const y = /(\d+)\s*년/.exec(d); const m = /(\d+)\s*개월/.exec(d);
   return (y ? +y[1] * 12 : 0) + (m ? +m[1] : 0);
 }
+// "2026.02" 형식 → 오늘까지 경과 개월 수 (현재 무직 기간 자동 계산)
+function monthsSince(ym) {
+  const [y, m] = String(ym).split(".").map(Number);
+  if (!y || !m) return 0;
+  const d = new Date();
+  return Math.max(0, (d.getFullYear() - y) * 12 + (d.getMonth() + 1 - m));
+}
 // 면접 후보 경력사항 내장 데이터 (이력서 PDF 정독 기반) — 이력서 텍스트에 [경력 이력]이 없어도 표시
 const CAREER_BUILTIN = {
   "오세현": {
     header: "표기 6년 — ⚠ 최근 3개사 연속 단기",
     rows: [
+      { current: true, company: "현재 무직", role: "오비랩 퇴사 후 구직 중", since: "2026.02" },
       { company: "오비랩(OviLab)", role: "Growth & Tech Lead", period: "2025.06~2026.02", dur: "9개월 ⚠", work: "AI 소재 제작(CTR 2.5배)·ROAS 1,928%·광고비 -63%, 리뷰 1만건 마이닝→카피, 로컬 LLM 에이전트 자작" },
-      { gap: true, label: "공백 2026.02~ 현재 6개월 (퇴사 후)" },
       { gap: true, label: "공백 2025.03~2025.06 · 3개월" },
       { company: "비오스드림", role: "Growth Marketing Lead", period: "2024.02~2025.03", dur: "1년 1개월", work: "B2B→D2C 피봇 주도(매출 12배 주장 — 수치 검증 필요), 테크니컬 SEO 인프라, CRM 리텐션 루프" },
       { company: "아이마이미마인(IMYMEMINE)", role: "Commerce Operation Manager", period: "2023.10~2024.02", dur: "5개월 ⚠", work: "고관여 커머스 운영 — BigQuery 퍼널 분석으로 상세페이지 이탈 95% 병목 발견→CVR 2.5배" },
@@ -1417,6 +1424,17 @@ function InterviewResumeCard({ candidate }) {
           <tbody>
             {career.rows.map((r, i) => r.gap ? (
               <tr key={i}><td colSpan={3} style={{ ...cell, color: C.amber, fontStyle: "italic", fontSize: 10.5 }}>… {r.label}</td></tr>
+            ) : r.current ? (
+              <tr key={i} style={{ background: "#FEF2F2" }}>
+                <td style={cell}>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: C.red }}>⚠ {r.company}</span>
+                  {r.role && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 1 }}>{r.role}</div>}
+                </td>
+                <td style={{ ...cell, textAlign: "center", fontSize: 10.5, whiteSpace: "nowrap", color: C.sub }}>{r.since}~현재</td>
+                <td style={{ ...cell, textAlign: "center" }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: C.red, background: `${C.red}12`, border: `1px solid ${C.red}35`, padding: "1px 6px", borderRadius: 8, whiteSpace: "nowrap" }}>공백 {monthsSince(r.since)}개월</span>
+                </td>
+              </tr>
             ) : (
               <tr key={i}>
                 <td style={cell}>
