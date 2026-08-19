@@ -1021,6 +1021,8 @@ function obDays(startDate) {
 function OnboardingView({ candidates, positions, onUpdate, showToast }) {
   const list = candidates.filter(c => c.onboarding || ["합격", "처우협의"].includes(c.stage));
   const [selId, setSelId] = useState(null);
+  const [obTab, setObTab] = useState("ms");
+  const [c35Edit, setC35Edit] = useState(false);
   const c = list.find(x => x.id === selId) || list[0];
   const removeOb = (x) => {
     if (x.onboarding && !confirm(`${x.name}의 온보딩 기록을 삭제하고 목록에서 뺄까요?`)) return;
@@ -1057,8 +1059,15 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
   const setC35 = (p) => patch({ card35: { ...c35, ...p, at: Date.now() } });
   const setC35Task = (i, f, v) => { const t = [...(c35.tasks || [{}, {}, {}])]; t[i] = { ...(t[i] || {}), [f]: v }; setC35({ tasks: t }); };
   const setC35Goal = (i, f, v) => { const g = [...(c35.goals || [{}, {}, {}, {}, {}])]; g[i] = { ...(g[i] || {}), [f]: v }; setC35({ goals: g }); };
-  const loadC35Template = () => {
-    if ((c35.tasks || c35.goals) && !confirm("이미 작성된 35CARD가 있습니다. 마케터 기본 템플릿으로 덮어쓸까요?")) return;
+  // 미작성이면 대표 작성본(구글시트 35CARD)을 자동 표시. '수정' 누르는 순간 이 후보 데이터로 저장.
+  const c35Filled = !!(c35.tasks || c35.goals);
+  const c35v = c35Filled ? c35 : C35_MARKETER_TEMPLATE;
+  const startC35Edit = () => {
+    if (!c35Filled) setC35({ ...C35_MARKETER_TEMPLATE, tv: (c35.tv || 0) + 1 });
+    setC35Edit(true);
+  };
+  const resetC35Template = () => {
+    if (!confirm("작성 내용을 버리고 기본 템플릿(대표 작성본)으로 되돌릴까요?")) return;
     setC35({ ...C35_MARKETER_TEMPLATE, tv: (c35.tv || 0) + 1 });
   };
   const INP = { width: "100%", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "7px 10px", fontSize: 12.5, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
@@ -1081,7 +1090,7 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
           const on = x.id === c.id;
           const xd = obDays(x.onboarding?.startDate);
           return (
-            <button key={x.id} onClick={() => setSelId(x.id)} style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 11px 8px 14px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", background: on ? C.glow : C.card, border: `1px solid ${on ? C.accent : C.border}`, color: on ? C.accent : C.sub, fontSize: 13, fontWeight: on ? 700 : 500 }}>
+            <button key={x.id} onClick={() => { setSelId(x.id); setC35Edit(false); }} style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 11px 8px 14px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", background: on ? C.glow : C.card, border: `1px solid ${on ? C.accent : C.border}`, color: on ? C.accent : C.sub, fontSize: 13, fontWeight: on ? 700 : 500 }}>
               {x.name} {xd != null ? `· D+${xd}` : "· 시작 전"}
               <span onClick={e => { e.stopPropagation(); removeOb(x); }} title="온보딩에서 제외 (기록 삭제)" style={{ color: C.muted, fontSize: 12, lineHeight: 1, padding: "2px 3px", borderRadius: 5 }}>✕</span>
             </button>
@@ -1106,14 +1115,19 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
           </div>
         </div>
       </div>
-      <div key={c.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[["ms", "📍 마일스톤 · 기대치"], ["c35", "🗂 35CARD"], ["retro", "🗓 회고 · 전환 판단"]].map(([k, l]) => (
+          <button key={k} onClick={() => setObTab(k)} style={{ padding: "9px 18px", borderRadius: 10, border: `1px solid ${obTab === k ? C.accent : C.border}`, background: obTab === k ? C.glow : C.card, color: obTab === k ? C.accent : C.sub, fontSize: 13, fontWeight: obTab === k ? 700 : 500, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{l}</button>
+        ))}
+      </div>
+      <div key={c.id}>
+        {obTab === "ms" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 10 }}>📍 3개월 마일스톤 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· 지연(빨강)은 그 주에 반드시 해소</span></div>
             {OB_MILESTONES.map(m => {
               const [key, label, owner] = m;
               const st = msState(m);
-              const col = st === "done" ? C.green : st === "overdue" ? C.red : st === "current" ? C.accent : C.muted;
               return (
                 <div key={key} onClick={() => toggleMs(key)} style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: st === "overdue" ? "#FEF2F2" : st === "current" ? C.glow : "transparent", border: `1px solid ${st === "overdue" ? `${C.red}40` : st === "current" ? `${C.accent}30` : "transparent"}`, marginBottom: 4 }}>
                   <span style={{ fontSize: 15, lineHeight: "18px" }}>{st === "done" ? "✅" : st === "overdue" ? "🔴" : "⬜"}</span>
@@ -1135,13 +1149,52 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
             <div style={{ height: 6 }} />
             {TA(ob.expectations?.m3, "Month 3 기대: 예) 주력 채널 1개를 개입 없이 운영 → 전환 판단", v => patch({ expectations: { ...(ob.expectations || {}), m3: v } }), 2)}
           </div>
-          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+        </div>
+        )}
+        {obTab === "c35" && (
+        <div style={{ maxWidth: 880 }}>
+          <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 18 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>🗂 35CARD</span>
-              <span style={{ fontSize: 11, color: C.muted, flex: 1 }}>· 입사 첫날 작성 → 월 1회 1:1 미팅의 기준 문서</span>
-              <button onClick={loadC35Template} style={{ padding: "4px 10px", borderRadius: 7, background: C.glow, border: `1px solid ${C.accent}40`, color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>마케터 템플릿 불러오기</button>
+              <span style={{ fontSize: 14, fontWeight: 700, color: C.sub }}>🗂 35CARD — {c.name}</span>
+              <span style={{ fontSize: 11, color: C.muted, flex: 1 }}>· 입사 첫날 리뷰 미팅 → 월 1회 1:1의 기준 문서</span>
+              {!c35Edit ? (
+                <button onClick={startC35Edit} style={{ padding: "7px 16px", borderRadius: 8, background: `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>✎ 수정</button>
+              ) : (<>
+                <button onClick={resetC35Template} style={{ padding: "6px 11px", borderRadius: 8, background: "transparent", border: `1px solid ${C.borderL}`, color: C.sub, fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>템플릿으로 초기화</button>
+                <button onClick={() => setC35Edit(false)} style={{ padding: "7px 16px", borderRadius: 8, background: C.green, border: "none", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>✓ 완료</button>
+              </>)}
             </div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 10 }}>3대 과업(역할 정의) + 5대 해결과제(90일 목표) — 본인과 같이 작성하고, 매월 회고에서 이 카드로 진척을 점검</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>
+              {c35Filled || c35Edit
+                ? "3대 과업(역할 정의) + 5대 해결과제(90일 목표) — 입사 첫날 본인과 같이 확정하고, 매월 회고에서 이 카드로 진척 점검"
+                : "지금 보이는 내용은 대표님이 작성하신 기준 카드(시트 원본)입니다 — ✎ 수정을 누르면 이 후보 전용으로 저장되고 자유롭게 고칠 수 있습니다"}
+            </div>
+            {!c35Edit ? (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: C.accent, marginBottom: 8 }}>3대 과업</div>
+                {(c35v.tasks || []).map((t, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, marginBottom: 10, padding: "10px 12px", background: C.surface, borderRadius: 9, border: `1px solid ${C.border}` }}>
+                    <span style={{ minWidth: 22, height: 22, borderRadius: 6, background: C.glow, color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>{i + 1}</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 3 }}>{t.role || "—"}</div>
+                      <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6 }}>{t.detail || ""}</div>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: C.accent, margin: "14px 0 8px" }}>5대 해결과제</div>
+                {(c35v.goals || []).map((g, i) => (
+                  <div key={i} style={{ marginBottom: 8, padding: "10px 12px", background: C.surface, borderRadius: 9, border: `1px solid ${C.border}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ minWidth: 22, height: 22, borderRadius: 6, background: C.glow, color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>{i + 1}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: C.text, flex: 1 }}>{g.title || "—"}</span>
+                      {g.when && <span style={{ fontSize: 10.5, fontWeight: 700, color: C.teal, background: `${C.teal}15`, border: `1px solid ${C.teal}35`, padding: "2px 8px", borderRadius: 10, whiteSpace: "nowrap" }}>{g.when}</span>}
+                    </div>
+                    {g.vision && <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, marginLeft: 30 }}><b style={{ color: C.green }}>달성 모습</b> · {g.vision}</div>}
+                    {g.idea && <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, marginLeft: 30, marginTop: 2 }}><b style={{ color: C.purple }}>방법</b> · {g.idea}</div>}
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div key={`c35-${c35.tv || 0}`}>
               <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 6 }}>3대 과업</div>
               {[0, 1, 2].map(i => (
@@ -1154,7 +1207,7 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
               {[0, 1, 2, 3, 4].map(i => {
                 const g = c35.goals?.[i] || {};
                 return (
-                  <details key={i} style={{ marginBottom: 6, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 11px" }}>
+                  <details key={i} open={i === 0} style={{ marginBottom: 6, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "7px 11px" }}>
                     <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: g.title ? C.text : C.muted }}>
                       과제 {i + 1} · {g.title || "제목 미작성 — 펼쳐서 작성"} {g.when && <span style={{ fontSize: 10.5, color: C.muted, fontWeight: 500 }}>({g.when})</span>}
                     </summary>
@@ -1168,8 +1221,12 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
                 );
               })}
             </div>
+            )}
           </div>
         </div>
+        )}
+        {obTab === "retro" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {OB_RETROS.map(([rk, label]) => {
             const r = ob.retros?.[rk] || {};
@@ -1185,6 +1242,8 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
               </div>
             );
           })}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ background: C.card, borderRadius: 13, border: `2px solid ${tr.verdict ? (OB_VERDICTS.find(v => v[0] === tr.verdict)?.[2] || C.border) : C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 3 }}>⚖️ Month 3 전환 판단 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· Month 3 첫 주에 — 만료 직전이면 늦다</span></div>
             <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 10 }}>최종 질문: &ldquo;이 사람에게 광고비와 브랜드를 믿고 맡기는 모습이 상상되는가?&rdquo;</div>
@@ -1212,6 +1271,8 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
             {TA(tr.note, "판단 근거 메모: 어떤 사례·기록이 이 판정을 뒷받침하는가", v => setTr({ note: v }), 2)}
           </div>
         </div>
+        </div>
+        )}
       </div>
     </div>
   );
