@@ -1314,6 +1314,95 @@ function ConditionsCard({ candidate, onUpdate }) {
   );
 }
 
+// ─── 면접실 이력서 카드: 사람인 형식 경력사항 표 + 원본 PDF 경로 + 원문 ────────
+function parseCareerRows(resume) {
+  const lines = (resume || "").split("\n");
+  const s = lines.findIndex(l => l.trim().startsWith("[경력 이력]"));
+  if (s < 0) return null;
+  const header = lines[s].replace("[경력 이력]", "").trim();
+  const rows = []; let note = "";
+  for (let i = s + 1; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (l.startsWith("[")) break;
+    if (l.startsWith("→")) { note = l.slice(1).trim(); continue; }
+    if (!l.startsWith("·")) continue;
+    const body = l.slice(1).trim();
+    if (body.startsWith("(")) { rows.push({ gap: true, label: body.replace(/^\(|\)$/g, "") }); continue; }
+    const parts = body.split("|").map(x => x.trim());
+    const dash = (parts[0] || "").split("—").map(x => x.trim());
+    rows.push({ company: dash[0] || "", role: dash.slice(1).join(" — "), period: parts[1] || "", dur: parts.slice(2).join(" ") });
+  }
+  return rows.length ? { header, rows, note } : null;
+}
+function durMonths(d) {
+  const y = /(\d+)\s*년/.exec(d); const m = /(\d+)\s*개월/.exec(d);
+  return (y ? +y[1] * 12 : 0) + (m ? +m[1] : 0);
+}
+function InterviewResumeCard({ candidate }) {
+  const [copied, setCopied] = useState(null);
+  const career = parseCareerRows(candidate.resume);
+  const refs = candidate.fileRefs || [];
+  const meta = {};
+  (candidate.resume || "").split("\n").forEach(l => {
+    const m = /^\[(최근 경력|연봉|리스크)\]\s*(.+)/.exec(l.trim());
+    if (m) meta[m[1]] = m[2];
+  });
+  const copy = async (r) => { try { await navigator.clipboard.writeText(r.path || r.name); setCopied(r.name); setTimeout(() => setCopied(null), 1600); } catch (e) {} };
+  const cell = { padding: "6px 8px", fontSize: 11.5, borderBottom: `1px solid ${C.border}`, verticalAlign: "top", color: C.text, textAlign: "left" };
+  return (
+    <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: C.sub, marginBottom: 6 }}>📄 이력서 · 경력사항 <span style={{ fontWeight: 400, fontSize: 10.5, color: C.muted }}>· 면접실에서 바로 확인</span></div>
+      {meta["최근 경력"] && <div style={{ fontSize: 11.5, color: C.sub, marginBottom: 8, lineHeight: 1.5 }}>{meta["최근 경력"]}{meta["연봉"] ? ` · 연봉 ${meta["연봉"]}` : ""}</div>}
+      {career ? (<>
+        {career.header && <div style={{ fontSize: 11, fontWeight: 700, color: career.header.includes("⚠") ? C.red : career.header.includes("✅") ? C.green : C.muted, marginBottom: 6 }}>{career.header}</div>}
+        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 8 }}>
+          <thead><tr>
+            <th style={{ ...cell, color: C.muted, fontSize: 10.5, fontWeight: 600 }}>회사 / 직무</th>
+            <th style={{ ...cell, color: C.muted, fontSize: 10.5, fontWeight: 600, textAlign: "center", width: 104 }}>재직기간</th>
+            <th style={{ ...cell, color: C.muted, fontSize: 10.5, fontWeight: 600, textAlign: "center", width: 70 }}>근속</th>
+          </tr></thead>
+          <tbody>
+            {career.rows.map((r, i) => r.gap ? (
+              <tr key={i}><td colSpan={3} style={{ ...cell, color: C.amber, fontStyle: "italic", fontSize: 10.5 }}>… {r.label}</td></tr>
+            ) : (
+              <tr key={i}>
+                <td style={cell}><div style={{ fontWeight: 700, fontSize: 12 }}>{r.company}</div>{r.role && <div style={{ fontSize: 10.5, color: C.muted, marginTop: 1 }}>{r.role}</div>}</td>
+                <td style={{ ...cell, textAlign: "center", fontSize: 10.5, whiteSpace: "nowrap", color: C.sub }}>{r.period}</td>
+                <td style={{ ...cell, textAlign: "center" }}>{(() => {
+                  const mo = durMonths(r.dur);
+                  const warn = r.dur.includes("⚠") || (mo > 0 && mo < 12);
+                  const good = r.dur.includes("★") || r.period.includes("재직");
+                  const col = warn ? C.red : good ? C.green : C.sub;
+                  return <span style={{ fontSize: 10.5, fontWeight: 700, color: col, background: `${col}12`, border: `1px solid ${col}35`, padding: "1px 6px", borderRadius: 8, whiteSpace: "nowrap" }}>{r.dur.replace(/[⚠★]/g, "").replace(/퇴사.*$/, "").trim() || "-"}</span>;
+                })()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {career.note && <div style={{ fontSize: 11, color: "#B45309", background: "#FFF7E0", border: "1px solid #F1E2B6", borderRadius: 7, padding: "6px 9px", lineHeight: 1.5, marginBottom: 8 }}>💡 {career.note}</div>}
+      </>) : (
+        <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 8 }}>경력 이력 데이터 없음 — 아래 원문·원본 파일 참조</div>
+      )}
+      {refs.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+          {refs.map((r, i) => (
+            <button key={i} onClick={() => copy(r)} title={r.path || r.name} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 8, background: C.surface, border: `1px solid ${C.border}`, color: copied === r.name ? C.green : C.sub, fontSize: 10.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", maxWidth: "100%" }}>
+              📎 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{r.name}</span>{copied === r.name ? " ✓ 경로 복사됨" : ""}
+            </button>
+          ))}
+          <span style={{ fontSize: 10, color: C.muted, alignSelf: "center" }}>클릭=경로 복사 → 탐색기/브라우저에 붙여넣어 원본 PDF 열기</span>
+        </div>
+      )}
+      {candidate.resume && (
+        <details>
+          <summary style={{ cursor: "pointer", fontSize: 11, fontWeight: 600, color: C.accent }}>제출된 이력서 원문 보기</summary>
+          <div style={{ marginTop: 6, padding: "9px 11px", background: C.surface, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 11.5, color: C.sub, lineHeight: 1.7, whiteSpace: "pre-wrap", maxHeight: 260, overflowY: "auto" }}>{candidate.resume}</div>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
   const rc = ROLE_COLORS[position?.colorIdx || 0];
   const [recording, setRecording] = useState(false);
@@ -1579,6 +1668,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
               </div>
             )}
           </div>
+          <InterviewResumeCard candidate={candidate} />
           {history.length > 1 && (
             <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: C.sub, marginBottom: 12 }}>📈 점수 변화</div>
