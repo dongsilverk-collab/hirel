@@ -2136,6 +2136,7 @@ const SAMPLE_CANDIDATES = [
 
 export default function HireL() {
   const [view, setView] = useState("dashboard");
+  const [dataMenu, setDataMenu] = useState(false);
   const [positions, setPositions] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [selectedPositionId, setSelectedPositionId] = useState("all");
@@ -2575,30 +2576,21 @@ export default function HireL() {
             <span style={{ fontSize: 15, fontWeight: 700 }}>HireL</span>
             <span style={{ fontSize: 10, color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: "2px 7px", borderRadius: 18 }}>BETA</span>
           </div>
-          <div style={{ display: "flex", gap: 3 }}>
-            {[["dashboard", "◫ 대시보드"], ["board", "▦ 보드"], ["library", "🗂 자료실"], ["detail", "◉ 상세 분석"], ["report", "📊 채용 리포트"], ["onboarding", "🌱 온보딩"]].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} style={{ padding: "5px 14px", borderRadius: 7, border: "none", fontSize: 13, fontWeight: 500, background: view === v ? C.glow : "transparent", color: view === v ? C.accent : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{l}</button>
+          <div style={{ display: "flex", gap: 2, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 3, flexShrink: 0 }}>
+            {[["dashboard", "대시보드"], ["board", "보드"], ["library", "자료실"], ["detail", "상세 분석"], ["report", "리포트"], ["onboarding", "온보딩"]].map(([v, l]) => (
+              <button key={v} onClick={() => setView(v)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: view === v ? 700 : 500, whiteSpace: "nowrap", background: view === v ? C.glow : "transparent", color: view === v ? C.accent : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{l}</button>
             ))}
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-            <button onClick={exportLedger} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              📊 대장 내보내기
-            </button>
-            <button onClick={exportJSON} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              📤 팀 공유
-            </button>
-            <button onClick={() => importRef.current?.click()} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              📥 불러오기
-            </button>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             {!syncEnabled ? (
-              <button onClick={createRoom} style={{ ...BP(`linear-gradient(135deg,${C.green},${C.teal})`), padding: "7px 16px", fontSize: 12, display: "flex", alignItems: "center", gap: 6, boxShadow: "0 1px 3px rgba(0,0,0,.1)" }}>
-                🔴 실시간 공유 시작
+              <button onClick={createRoom} style={{ height: 34, padding: "0 13px", borderRadius: 8, background: "transparent", border: `1px solid ${C.green}45`, color: C.green, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.green, display: "inline-block" }} />공유 시작
               </button>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: syncStatus === "connected" ? "rgba(16,185,129,.1)" : "rgba(245,158,11,.1)", border: `1px solid ${syncStatus === "connected" ? "rgba(16,185,129,.3)" : "rgba(245,158,11,.3)"}`, borderRadius: 9, padding: "6px 14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7, background: syncStatus === "connected" ? "rgba(16,185,129,.08)" : "rgba(245,158,11,.08)", border: `1px solid ${syncStatus === "connected" ? "rgba(16,185,129,.3)" : "rgba(245,158,11,.3)"}`, borderRadius: 8, padding: "0 11px", height: 34, whiteSpace: "nowrap" }}>
                 <div style={{ width: 7, height: 7, borderRadius: "50%", background: syncStatus === "connected" ? C.green : C.amber, animation: "pulse 1.5s ease infinite" }} />
                 <span style={{ fontSize: 12, color: syncStatus === "connected" ? C.green : C.amber, fontWeight: 600 }}>
-                  {isRoomHost ? `룸: ${roomId}` : syncStatus === "connected" ? "동기화 완료" : "동기화 중..."}
+                  {isRoomHost ? `룸 ${roomId}` : syncStatus === "connected" ? "동기화" : "동기화 중"}
                 </span>
                 {isRoomHost && (
                   <button onClick={async () => {
@@ -2606,16 +2598,30 @@ export default function HireL() {
                     const u = `${window.location.origin}?room=${roomId}`;
                     await navigator.clipboard.writeText(u).catch(()=>{});
                     showToast("링크 복사됨!");
-                  }} style={{ background: "none", border: "none", color: C.green, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>📋 링크 복사</button>
+                  }} style={{ background: "none", border: "none", color: C.green, cursor: "pointer", fontSize: 12, fontFamily: "inherit", padding: 0 }}>링크 복사</button>
                 )}
-                <button onClick={stopSync} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 14 }}>✕</button>
+                <button onClick={stopSync} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 13, padding: 0 }}>✕</button>
               </div>
             )}
-            <button onClick={() => { if(confirm("저장된 데이터를 전부 초기화할까요?")) { localStorage.removeItem("hirel_data"); window.location.reload(); } }} style={{ ...BP("transparent"), border: `1px solid ${C.red}40`, color: C.red, boxShadow: "none", padding: "7px 14px", fontSize: 12 }}>
-              🗑 초기화
-            </button>
-            <button onClick={openAddCandidate} style={{ ...BP(), padding: "8px 16px", fontSize: 13 }}>+ 후보자</button>
-            <button onClick={() => { setEditingPosition(null); setShowPositionModal(true); }} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.accent, boxShadow: "none", padding: "8px 16px", fontSize: 13 }}>+ 포지션</button>
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setDataMenu(v => !v)} style={{ height: 34, padding: "0 13px", borderRadius: 8, background: dataMenu ? C.glow : "transparent", border: `1px solid ${dataMenu ? C.accent : C.borderL}`, color: dataMenu ? C.accent : C.sub, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>데이터 ▾</button>
+              {dataMenu && (<>
+                <div onClick={() => setDataMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 110 }} />
+                <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 120, background: C.card, border: `1px solid ${C.border}`, borderRadius: 11, boxShadow: "0 10px 30px rgba(0,0,0,.13)", padding: 6, minWidth: 185 }}>
+                  {[
+                    ["📊 대장 내보내기", () => exportLedger(), C.text],
+                    ["📤 팀 공유 (JSON 저장)", () => exportJSON(), C.text],
+                    ["📥 불러오기", () => importRef.current?.click(), C.text],
+                  ].map(([l, fn, col]) => (
+                    <button key={l} onClick={() => { setDataMenu(false); fn(); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", borderRadius: 8, border: "none", background: "transparent", color: col, fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{l}</button>
+                  ))}
+                  <div style={{ height: 1, background: C.border, margin: "5px 6px" }} />
+                  <button onClick={() => { setDataMenu(false); if (confirm("저장된 데이터를 전부 초기화할까요?")) { localStorage.removeItem("hirel_data"); window.location.reload(); } }} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", borderRadius: 8, border: "none", background: "transparent", color: C.red, fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>🗑 전체 초기화</button>
+                </div>
+              </>)}
+            </div>
+            <button onClick={() => { setEditingPosition(null); setShowPositionModal(true); }} style={{ height: 34, padding: "0 13px", borderRadius: 8, background: "transparent", border: `1px solid ${C.borderL}`, color: C.sub, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>+ 포지션</button>
+            <button onClick={openAddCandidate} style={{ height: 34, padding: "0 16px", borderRadius: 8, background: `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", boxShadow: "0 1px 3px rgba(0,0,0,.12)" }}>+ 후보자</button>
           </div>
         </div>
       </div>
