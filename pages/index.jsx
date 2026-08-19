@@ -704,8 +704,84 @@ const Q_SECTION_DEFS = [
   ["dataSkill", "📊 데이터 실전능력", C.teal],
   ["execution", "⚡ 실행력", "#F97316"],
 ];
+// ─── 면접키트 v2: 후보별 킷 질문 (합격 신호 / Red Flag) + Gray Area 룰 ─────────
+// 룰: ❌ Red Flag 답변 2개 이상 또는 ⚠ 애매(Gray) 답변 3개 이상 → 탈락 권고
+const GRAY_RULE = { red: 2, gray: 3 };
+const KIT_COMMON = [
+  { text: "(조건 선고지 — 최초반) 저희는 ①3개월 계약 후 전환 ②팀원 0명, 본인이 1호 ③연봉 상한 5,500입니다. 이 세 가지가 괜찮으신가요?", pass: "세 조건 모두 수용 + 이유가 구체적", red: "조건부 수용인데 이유가 모호 / '일단 들어가서 조정' 뉘앙스" },
+  { text: "저희 자사몰(curaelmall.com)이나 제품을 보고 오셨나요? 첫인상은요?", pass: "제품·리뷰·상세페이지까지 구체적 관찰 1개 이상", red: "'아직 못 봤다' — 지원 동기 약함" },
+];
+const KIT_QUESTIONS = {
+  "오세현": [
+    { text: "오비랩을 올해 2월에 나오신 걸로 되어 있는데, 퇴사 계기와 그 이후는 어떻게 보내셨나요? (프로필 '재직중' 표기 불일치도 자연스럽게 확인)", pass: "사유가 구체적·일관, 공백기에 한 일을 실물로 설명", red: "회사 탓 반복 / 불일치를 얼버무림 / 공백기 설명이 추상적" },
+    { text: "매출 성장이 12배로도 17배로도 나오는데, 정확한 숫자·기간과 본인 기여 부분을 분리해 주세요.", pass: "기준 차이를 즉시 설명하고 본인 기여를 '이건 팀, 이건 나'로 분리", red: "숫자가 또 바뀜 / 기여 분리 불가" },
+    { text: "AI 소재 CTR 2.5배 — 암 환우·가족이 보는 브랜드에서 '진짜 사람의 진심' 톤을 AI로 낼 수 있다고 보세요?", pass: "AI 한계 인정 + 사람 개입 지점(검수·톤 가이드) 설계", red: "'AI가 다 됩니다' 만능주의 / 감수성 없이 효율 얘기만" },
+    { text: "리뷰 1만건 마이닝→카피까지 과정을 처음부터 걸어가 주세요. 큐라엘이면 어떤 키워드부터 긁겠어요?", pass: "단계별 도구·판단이 구체적 + 즉석 적용이 그럴듯함", red: "결과 숫자만 반복 / 즉석 질문에 일반론" },
+    { text: "상세페이지 이탈 95% 병목에서 소구점을 어떻게 바꿨고 왜 먹혔나요?", pass: "가설→변경→수치 검증이 한 흐름", red: "'왜'와 '검증'이 없음" },
+    { text: "블로그 주 2~3건, 인스타 운영 같은 반복 업무가 이 자리의 30%입니다. 지루하지 않겠어요?", pass: "솔직한 인정 + 본인의 지속 장치(루틴화·자동화)", red: "'다 좋습니다' 식 무조건 수용" },
+    { text: "희망 연봉이 '무관'이던데 실제 기대 레인지는요?", pass: "5,500 이내 구체 답변", red: "회피하거나 면접 후반에 말 바꿈" },
+  ],
+  "박현철": [
+    { text: "(최초반) 저희 레인지는 4,000~5,500입니다. 그룹바이에 7,000으로 적으셨던데, 이 레인지에서도 이 자리가 의미 있나요?", pass: "수용 + 이유가 구체적(실무 복귀·카테고리 관심)", red: "'일단 들어가서 조정' 뉘앙스 → 정중히 조기 종료" },
+    { text: "Anti-aging Club 7개월째인데 움직이시는 이유는요?", pass: "현직의 구조적 이슈를 남 탓 없이 구체적으로", red: "단기 3회(3·4·7개월) 패턴 자각 없음 / 매번 회사 탓" },
+    { text: "팀장 직함 없이 광고 계정을 본인 손으로 돌리는 자리입니다. 최근 '직접' 세팅한 캠페인이 언제였나요?", pass: "최근 3개월 내 직접 세팅을 캠페인 구조 수준까지 구체적으로", red: "'팀원 시켜서' / 직접 세팅이 1년 이상 전 / 관리 얘기로 빠짐" },
+    { text: "건기식·의료 표현에서 실제 걸러낸 사례 2~3개와, '암 환자의 회복을 돕는다'는 메시지 사용 가능 여부는?", pass: "실사례 + 법적 근거 + 대체 표현 → 심의 게이트 역할 확정", red: "일반론뿐 / 사례를 못 꺼냄" },
+    { text: "버핏서울 분기 목표 7회 초과 중 본인이 만든 레버 하나만 깊게 설명해 주세요.", pass: "레버 하나를 수치·과정으로 깊게", red: "7회를 나열만 하고 하나도 깊게 못 들어감" },
+    { text: "메타·네이버·구글에 월 1,000만원이면 큐라엘엔 어떻게 배분하고, 첫 달에 뭘 테스트하겠어요?", pass: "근거 있는 배분 + 테스트 설계(소재 수·지표·기간)", red: "매체 나열만 / '해봐야 안다' 회피" },
+    { text: "김동은 상무님이 광고를 총괄해 오셨습니다. 역할을 어떻게 나누시겠어요?", pass: "실무는 본인·전략 정렬은 상무, 갈등 시나리오까지 담담하게", red: "서열 정리 집착 / '다 제가' 또는 '시키는 대로' 양극단" },
+  ],
+  "이찬우": [
+    { text: "(핵심 관문) 포트폴리오가 오픈톡·밴드·영상 중심인데, 메타나 네이버 '광고 계정'을 직접 세팅·운영해 본 경험을 구체적으로 말씀해 주세요.", pass: "캠페인 구조·타겟·예산·지표까지 직접 만진 이야기 (규모 작아도 OK)", red: "광고는 대행사/타 부서, 본인은 소재만 / 용어가 겉돎 → ①전환형 부적합, 소재제작 역할 재검토" },
+    { text: "앨트웰 3년 6개월 재직 중인데 옮기려는 이유는요? 희망 4,000은 현재 연봉 대비 어떤가요?", pass: "성장·역할 확장의 구체적 사유 + 합리적 인상 폭", red: "현직 불만 나열 / 4,000이 협상용이었다며 말 바꿈" },
+    { text: "프로모션 누적 매출 28.31억에서 본인 기여를 분리하면 어디까지인가요?", pass: "기획·소재·채널 중 본인 담당을 분리하고 근거 제시", red: "회사 전체 매출을 본인 성과처럼 말함" },
+    { text: "영상 200편+ 중 성과가 가장 좋았던 1편 — 기획부터 성과 수치까지 걸어가 주세요.", pass: "타겟·훅·지표(조회·전환)가 한 흐름, 직접 제작", red: "'많이 만들었다'만 있고 성과 연결이 없음" },
+    { text: "AI 이미지·영상 제작을 실무에 어떻게 쓰고 있나요? 큐라엘(암 환우 브랜드) 톤에도 통할까요?", pass: "실제 워크플로우 + 카테고리 감수성(검수·톤 조정)", red: "툴 이름 나열만 / 감수성 질문에 효율 얘기만" },
+    { text: "건기식 심의 때문에 걸러본 표현이 있나요?", pass: "실사례 + 대체 표현", red: "건기식 3년 6개월 재직인데 사례가 안 나옴 (감점)" },
+  ],
+  "박보현": [
+    { text: "(포지셔닝 주의: ①전환형이 아니라 'datarize 고도화 시점의 ③CRM 풀 카드'인지 검증하는 면접) RFM·K-Means 세그멘테이션을 실무에서 어떻게 썼고, 매출이 어떻게 달라졌나요?", pass: "분석→캠페인 실행→성과까지 연결 (분석으로 끝나지 않음)", red: "방법론 설명만 길고 '그래서 뭘 했는지'가 없음" },
+    { text: "Make·n8n·Claude Code로 만든 자동화 중 가장 쓸모 있었던 것 하나를 보여주듯 설명해 주세요.", pass: "문제→자동화→절감 효과가 구체적, 직접 만든 증거", red: "튜토리얼 수준 / 실무 적용 증거 없음" },
+    { text: "저희는 소재 제작이 업무의 절반입니다. 콘텐츠·소재 경험이 약한데, 이 자리에서 어떻게 기여하시겠어요?", pass: "약점 인정 + CRM·데이터 기여 그림 또는 학습 계획", red: "약점 인정 없이 '다 할 수 있다'" },
+    { text: "세타필 캠페인에서 본인 역할과 성과는요? 건기식(식품·심의) 환경 차이는 어떻게 보세요?", pass: "더마→건기식 규제 차이 인지 + 학습 계획", red: "심의 개념 자체가 없음" },
+    { text: "언제부터 합류 가능하고, 희망 연봉은요? (→ 조건 기록 카드에 기입)" },
+  ],
+};
+function kitFor(candidate) {
+  const own = KIT_QUESTIONS[(candidate?.name || "").trim()];
+  return own ? [...KIT_COMMON, ...own] : null;
+}
+// 질문별 답변 판정(signal: pass/gray/red) 집계 → Gray Area 룰 판정
+function signalCounts(candidate) {
+  const qs = candidate?.questionScores || {};
+  let pass = 0, gray = 0, red = 0;
+  Object.values(qs).forEach(e => {
+    if (e?.signal === "pass") pass++;
+    else if (e?.signal === "gray") gray++;
+    else if (e?.signal === "red") red++;
+  });
+  return { pass, gray, red, fail: red >= GRAY_RULE.red || gray >= GRAY_RULE.gray };
+}
+function GrayAreaBanner({ candidate }) {
+  const { pass, gray, red, fail } = signalCounts(candidate);
+  if (!pass && !gray && !red) return null;
+  const chip = (label, n, color) => (
+    <span style={{ fontSize: 12, fontWeight: 700, color, background: `${color}15`, border: `1px solid ${color}35`, padding: "3px 10px", borderRadius: 12 }}>{label} {n}</span>
+  );
+  return (
+    <div style={{ background: fail ? "#FEF2F2" : C.card, border: `1px solid ${fail ? C.red : C.border}`, borderRadius: 13, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
+      <span style={{ fontSize: 13, fontWeight: 800, color: fail ? C.red : C.sub }}>{fail ? "🚫 탈락 권고 — Gray Area 룰 발동" : "⚖️ 답변 판정 현황"}</span>
+      {chip("✅ 신호", pass, C.green)}{chip("⚠ 애매", gray, C.amber)}{chip("❌ Red Flag", red, C.red)}
+      <span style={{ fontSize: 11, color: fail ? C.red : C.muted, marginLeft: "auto" }}>
+        {fail
+          ? (red >= GRAY_RULE.red ? `Red Flag ${GRAY_RULE.red}개 이상` : `애매한 답변 ${GRAY_RULE.gray}개 이상`) + " — “애매하면 불합격”. 뒤집으려면 랩업에서 기록으로 반박"
+          : `룰: ❌ ${GRAY_RULE.red}개 이상 또는 ⚠ ${GRAY_RULE.gray}개 이상이면 탈락 권고`}
+      </span>
+    </div>
+  );
+}
+
 // AI 생성 질문 + 직접 추가 질문(customQuestions)을 섹션 구조로 합침.
-// questionKey: AI 질문 "섹션-인덱스" (예: skill-0) / 직접 추가 "섹션-c고유id" (예: skill-cabc123)
+// questionKey: AI 질문 "섹션-인덱스" (예: skill-0) / 직접 추가 "섹션-c고유id" (예: skill-cabc123) / 킷 "kit-인덱스"
 function buildQuestionSections(candidate) {
   const iq = candidate?.analysis?.interviewQuestions;
   const custom = candidate?.customQuestions || {};
@@ -713,25 +789,40 @@ function buildQuestionSections(candidate) {
     ...base,
     ...(custom[secKey] || []).map(cq => ({ key: `${secKey}-c${cq.id}`, text: cq.text, custom: true, id: cq.id })),
   ];
+  const kit = kitFor(candidate);
+  const kitSections = (kit || custom.kit) ? [{
+    secKey: "kit", label: "📋 면접키트 v2 · 합격신호/Red Flag", color: C.red,
+    items: withCustom("kit", (kit || []).map((q, i) => ({ key: `kit-${i}`, text: q.text, custom: false, pass: q.pass || null, red: q.red || null }))),
+  }] : [];
+  let base;
   if (iq && typeof iq === "object" && !Array.isArray(iq)) {
-    return Q_SECTION_DEFS.map(([secKey, label, color]) => ({
+    base = Q_SECTION_DEFS.map(([secKey, label, color]) => ({
       secKey, label, color,
       items: withCustom(secKey, (iq[secKey] || []).map((q, i) => ({ key: `${secKey}-${i}`, text: q, custom: false }))),
     }));
+  } else if (Array.isArray(iq)) {
+    base = [{ secKey: "legacy", label: "💬 면접 질문", color: C.accent, items: withCustom("legacy", iq.map((q, i) => ({ key: `legacy-${i}`, text: q, custom: false }))) }];
+  } else {
+    // 분석 전 후보: 직접 추가 질문만 담는 섹션 하나
+    base = [{ secKey: "extra", label: "✍️ 직접 추가 질문", color: C.accent, items: withCustom("extra", []) }];
   }
-  if (Array.isArray(iq)) {
-    return [{ secKey: "legacy", label: "💬 면접 질문", color: C.accent, items: withCustom("legacy", iq.map((q, i) => ({ key: `legacy-${i}`, text: q, custom: false }))) }];
-  }
-  // 분석 전 후보: 직접 추가 질문만 담는 섹션 하나
-  return [{ secKey: "extra", label: "✍️ 직접 추가 질문", color: C.accent, items: withCustom("extra", []) }];
+  return [...kitSections, ...base];
 }
 
 // ─── 질문 카드 한 줄 (접기/펼치기 + 1~5 수동 채점 + 메모 + AI 근거) ─────────────
-function QuestionRow({ item, color, entry, open, onToggle, onManual, onNote, onDelete }) {
+const SIGNAL_DEFS = [
+  ["pass", "✅ 신호", "합격 신호에 부합하는 답변"],
+  ["gray", "⚠ 애매", "Gray Area — 애매한 답변 (3개 이상이면 탈락 권고)"],
+  ["red", "❌ Red Flag", "Red Flag 답변 (2개 이상이면 탈락 권고)"],
+];
+const SIGNAL_COLOR = { pass: C.green, gray: C.amber, red: C.red };
+const SIGNAL_LABEL = { pass: "✅ 신호", gray: "⚠ 애매", red: "❌ Red Flag" };
+function QuestionRow({ item, color, entry, open, onToggle, onManual, onNote, onDelete, onSignal }) {
   const [noteDraft, setNoteDraft] = useState(entry?.note || "");
   useEffect(() => { setNoteDraft(entry?.note || ""); }, [entry?.note]);
   const manual = entry?.manual ?? null;
   const ai = entry?.ai ?? null;
+  const signal = entry?.signal ?? null;
   const saveNote = () => { if ((entry?.note || "") !== noteDraft) onNote(noteDraft); };
   return (
     <div style={{ background: C.surface, borderRadius: 8, border: `1px solid ${open ? `${color}55` : C.border}`, marginBottom: 6, overflow: "hidden" }}>
@@ -739,6 +830,7 @@ function QuestionRow({ item, color, entry, open, onToggle, onManual, onNote, onD
         <span style={{ minWidth: 20, height: 20, borderRadius: 5, background: `${color}20`, color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, fontFamily: "'DM Mono',monospace" }}>Q</span>
         <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, flex: 1 }}>{item.text}</span>
         <span style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0, paddingTop: 1 }}>
+          {signal && <span style={{ fontSize: 10, fontWeight: 700, color: SIGNAL_COLOR[signal], background: `${SIGNAL_COLOR[signal]}15`, border: `1px solid ${SIGNAL_COLOR[signal]}35`, padding: "1px 7px", borderRadius: 9, whiteSpace: "nowrap" }}>{SIGNAL_LABEL[signal]}</span>}
           {item.custom && <span style={{ fontSize: 9, fontWeight: 700, color: C.teal, background: `${C.teal}15`, border: `1px solid ${C.teal}35`, padding: "1px 6px", borderRadius: 8, whiteSpace: "nowrap" }}>직접 추가</span>}
           {manual != null && <span style={{ fontSize: 10, fontWeight: 700, color: C.accent, background: `${C.accent}15`, border: `1px solid ${C.accent}35`, padding: "1px 7px", borderRadius: 9, whiteSpace: "nowrap" }}>내 {manual}점</span>}
           {ai != null && <span style={{ fontSize: 10, fontWeight: 700, color: C.purple, background: `${C.purple}15`, border: `1px solid ${C.purple}35`, padding: "1px 7px", borderRadius: 9, whiteSpace: "nowrap" }}>AI {ai}점</span>}
@@ -747,6 +839,26 @@ function QuestionRow({ item, color, entry, open, onToggle, onManual, onNote, onD
       </div>
       {open && (
         <div style={{ padding: "0 12px 11px 41px" }}>
+          {(item.pass || item.red) && (
+            <div style={{ marginBottom: 8, padding: "8px 11px", background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 11.5, lineHeight: 1.6 }}>
+              {item.pass && <div style={{ color: C.green }}><b>✅ 합격 신호</b> · {item.pass}</div>}
+              {item.red && <div style={{ color: C.red }}><b>❌ Red Flag</b> · {item.red}</div>}
+            </div>
+          )}
+          {onSignal && (
+            <div style={{ display: "flex", gap: 5, alignItems: "center", marginBottom: 7, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, color: C.muted, marginRight: 3 }}>답변 판정</span>
+              {SIGNAL_DEFS.map(([key, label, tip]) => {
+                const on = signal === key;
+                const col = SIGNAL_COLOR[key];
+                return (
+                  <button key={key} title={tip} onClick={() => onSignal(on ? null : key)}
+                    style={{ padding: "4px 11px", borderRadius: 14, fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: on ? col : C.card, border: `1px solid ${on ? col : C.borderL}`, color: on ? "#fff" : C.sub, transition: "all .12s" }}>{label}</button>
+                );
+              })}
+              {signal && <span style={{ fontSize: 10, color: C.muted }}>재클릭 시 해제</span>}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 5, alignItems: "center", marginBottom: 7 }}>
             <span style={{ fontSize: 11, color: C.muted, marginRight: 3 }}>내 채점</span>
             {[1, 2, 3, 4, 5].map(n => {
@@ -773,7 +885,7 @@ function QuestionRow({ item, color, entry, open, onToggle, onManual, onNote, onD
 function QuestionScoreSummary({ candidate, title }) {
   const qs = candidate?.questionScores || {};
   const sections = buildQuestionSections(candidate)
-    .map(s => ({ ...s, items: s.items.filter(it => { const e = qs[it.key]; return e && (e.manual != null || e.ai != null); }) }))
+    .map(s => ({ ...s, items: s.items.filter(it => { const e = qs[it.key]; return e && (e.manual != null || e.ai != null || e.signal); }) }))
     .filter(s => s.items.length > 0);
   if (!sections.length) return null;
   const avg = (vals) => vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10 : null;
@@ -781,10 +893,12 @@ function QuestionScoreSummary({ candidate, title }) {
   return (
     <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 18 }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 12 }}>{title || "📝 질문별 채점 요약"}</div>
+      <div style={{ marginBottom: 12 }}><GrayAreaBanner candidate={candidate} /></div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
             <th style={{ ...cell, color: C.muted, fontSize: 11, fontWeight: 600 }}>질문</th>
+            <th style={{ ...cell, color: C.muted, fontSize: 11, fontWeight: 600, width: 76, textAlign: "center" }}>판정</th>
             <th style={{ ...cell, color: C.accent, fontSize: 11, fontWeight: 600, width: 56, textAlign: "center" }}>내 점수</th>
             <th style={{ ...cell, color: C.purple, fontSize: 11, fontWeight: 600, width: 56, textAlign: "center" }}>AI 점수</th>
           </tr>
@@ -795,7 +909,7 @@ function QuestionScoreSummary({ candidate, title }) {
             const aAvg = avg(s.items.map(it => qs[it.key]?.ai).filter(v => v != null));
             return [
               <tr key={`${s.secKey}__h`}>
-                <td colSpan={3} style={{ ...cell, background: `${s.color}0D` }}>
+                <td colSpan={4} style={{ ...cell, background: `${s.color}0D` }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: s.color }}>{s.label}</span>
                   <span style={{ fontSize: 10, color: C.muted, marginLeft: 8 }}>
                     섹션 평균{mAvg != null ? ` 내 ${mAvg}점` : ""}{mAvg != null && aAvg != null ? " ·" : ""}{aAvg != null ? ` AI ${aAvg}점` : ""}
@@ -811,6 +925,7 @@ function QuestionScoreSummary({ candidate, title }) {
                       {e.note && <div style={{ fontSize: 11, color: C.sub, marginTop: 3 }}>✎ {e.note}</div>}
                       {e.aiEvidence && <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>🤖 {e.aiEvidence}</div>}
                     </td>
+                    <td style={{ ...cell, textAlign: "center", fontWeight: 700, color: e.signal ? SIGNAL_COLOR[e.signal] : C.muted, whiteSpace: "nowrap" }}>{e.signal ? SIGNAL_LABEL[e.signal] : "—"}</td>
                     <td style={{ ...cell, textAlign: "center", fontWeight: 700, color: e.manual != null ? C.accent : C.muted }}>{e.manual != null ? `${e.manual}점` : "—"}</td>
                     <td style={{ ...cell, textAlign: "center", fontWeight: 700, color: e.ai != null ? C.purple : C.muted }}>{e.ai != null ? `${e.ai}점` : "—"}</td>
                   </tr>
@@ -904,6 +1019,10 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
   const setQNote = (key, note) => patchQScores(n => {
     const prev = n[key] || { manual: null, ai: null, aiEvidence: null, note: "" };
     n[key] = { ...prev, note };
+  });
+  const setQSignal = (key, signal) => patchQScores(n => {
+    const prev = n[key] || { manual: null, ai: null, aiEvidence: null, note: "" };
+    n[key] = { ...prev, signal };
   });
   const addCustomQ = (secKey) => {
     const text = (addQInputs[secKey] || "").trim();
@@ -1019,9 +1138,10 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 370px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <GrayAreaBanner candidate={candidate} />
           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>💬 면접 질문 · 클릭해서 채점</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>💬 면접 질문 · 클릭해서 채점 + 답변 판정(✅/⚠/❌)</span>
               <span style={{ fontSize: 11, color: C.muted }}>총 {qList.length}개</span>
             </div>
             {qSections.map(sec => (
@@ -1034,6 +1154,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
                     onToggle={() => setOpenQ(p => p === it.key ? null : it.key)}
                     onManual={v => setManualScore(it.key, v)}
                     onNote={note => setQNote(it.key, note)}
+                    onSignal={sig => setQSignal(it.key, sig)}
                     onDelete={() => delCustomQ(sec.secKey, it.id)} />
                 ))}
                 <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
