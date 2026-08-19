@@ -1002,10 +1002,20 @@ function obDays(startDate) {
   const d = Math.floor((Date.now() - new Date(startDate + "T00:00:00").getTime()) / 86400000);
   return d < 0 ? null : d;
 }
-function OnboardingView({ candidates, positions, onUpdate }) {
+function OnboardingView({ candidates, positions, onUpdate, showToast }) {
   const list = candidates.filter(c => c.onboarding || ["합격", "처우협의"].includes(c.stage));
   const [selId, setSelId] = useState(null);
   const c = list.find(x => x.id === selId) || list[0];
+  const removeOb = (x) => {
+    if (x.onboarding && !confirm(`${x.name}의 온보딩 기록을 삭제하고 목록에서 뺄까요?`)) return;
+    onUpdate(x.id, { onboarding: null });
+    if (["합격", "처우협의"].includes(x.stage)) {
+      showToast && showToast(`${x.name}은 아직 '${x.stage}' 단계라 목록에 남습니다 — 보드에서 단계를 옮기면 사라져요`);
+    } else {
+      showToast && showToast(`${x.name} — 온보딩에서 제외됨`);
+    }
+    if (selId === x.id) setSelId(null);
+  };
   const ob = c?.onboarding || {};
   const patch = (p) => c && onUpdate(c.id, { onboarding: { ...ob, ...p } });
   const day = obDays(ob.startDate);
@@ -1046,8 +1056,9 @@ function OnboardingView({ candidates, positions, onUpdate }) {
           const on = x.id === c.id;
           const xd = obDays(x.onboarding?.startDate);
           return (
-            <button key={x.id} onClick={() => setSelId(x.id)} style={{ padding: "8px 14px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", background: on ? C.glow : C.card, border: `1px solid ${on ? C.accent : C.border}`, color: on ? C.accent : C.sub, fontSize: 13, fontWeight: on ? 700 : 500 }}>
+            <button key={x.id} onClick={() => setSelId(x.id)} style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 11px 8px 14px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", background: on ? C.glow : C.card, border: `1px solid ${on ? C.accent : C.border}`, color: on ? C.accent : C.sub, fontSize: 13, fontWeight: on ? 700 : 500 }}>
               {x.name} {xd != null ? `· D+${xd}` : "· 시작 전"}
+              <span onClick={e => { e.stopPropagation(); removeOb(x); }} title="온보딩에서 제외 (기록 삭제)" style={{ color: C.muted, fontSize: 12, lineHeight: 1, padding: "2px 3px", borderRadius: 5 }}>✕</span>
             </button>
           );
         })}
@@ -1066,6 +1077,7 @@ function OnboardingView({ candidates, positions, onUpdate }) {
             {day != null && <span style={{ fontSize: 16, fontWeight: 800, color: C.accent, fontFamily: "'DM Mono',monospace" }}>D+{day}</span>}
             <span style={{ fontSize: 12, fontWeight: 700, color: C.green }}>진행 {doneN}/{OB_MILESTONES.length}</span>
             {overdueN > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: C.red, background: "#FEF2F2", border: `1px solid ${C.red}40`, padding: "3px 10px", borderRadius: 12 }}>⚠ 지연 {overdueN}건 — 인사팀 확인 필요</span>}
+            <button onClick={() => removeOb(c)} title="온보딩 기록을 삭제하고 목록에서 제외" style={{ height: 30, padding: "0 11px", borderRadius: 8, background: "transparent", border: `1px solid ${C.red}40`, color: C.red, fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>✕ 온보딩 제외</button>
           </div>
         </div>
       </div>
@@ -2679,7 +2691,7 @@ export default function HireL() {
           <ReportView candidates={candidates} positions={positions} onExport={() => exportRecruitmentReport(candidates, positions)} />
         )}
         {view === "onboarding" && (
-          <OnboardingView candidates={candidates} positions={positions} onUpdate={updateCandidate} />
+          <OnboardingView candidates={candidates} positions={positions} onUpdate={updateCandidate} showToast={showToast} />
         )}
         {view === "library" && (
           <LibraryView candidates={filteredCandidates} positions={positions} onSelect={(id) => { setSelectedCandidateId(id); setActiveTab("overview"); setView("detail"); }} onToggleStar={toggleStar} />
