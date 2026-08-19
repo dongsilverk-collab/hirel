@@ -2710,12 +2710,13 @@ export default function HireL() {
                         showToast(`${cand.name} — ${stage} 단계로 이동`);
                       }
                     }}
-                    style={{ width: 232, minWidth: 232, flexShrink: 0, background: isFail ? "rgba(100,116,139,.08)" : C.surface, borderRadius: 12, border: `1px solid ${isFail ? C.border : `${col}35`}`, padding: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, padding: "2px 4px" }}>
+                    style={{ width: 232, minWidth: 232, flexShrink: 0, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 245px)", background: isFail ? "rgba(100,116,139,.08)" : C.surface, borderRadius: 12, border: `1px solid ${isFail ? C.border : `${col}35`}`, padding: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, padding: "2px 4px", flexShrink: 0 }}>
                       <div style={{ width: 8, height: 8, borderRadius: "50%", background: col }} />
                       <span style={{ fontSize: 13, fontWeight: 700, color: isFail ? C.muted : C.text }}>{stage}</span>
                       <span style={{ marginLeft: "auto", fontSize: 11, color: C.muted, fontFamily: "'DM Mono',monospace" }}>{cands.length}</span>
                     </div>
+                    <div style={{ overflowY: "auto", flex: 1, minHeight: 36, marginRight: -4, paddingRight: 4 }}>
                     {cands.length === 0 && <div style={{ fontSize: 11, color: C.muted, textAlign: "center", padding: "14px 0" }}>비어 있음</div>}
                     {cands.map(c => {
                       const pos = positions.find(p => p.id === c.positionId);
@@ -2761,6 +2762,7 @@ export default function HireL() {
                         </div>
                       );
                     })}
+                    </div>
                   </div>
                 );
               })}
