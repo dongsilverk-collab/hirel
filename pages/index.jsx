@@ -1348,6 +1348,7 @@ function monthsSince(ym) {
 // 면접 후보 경력사항 내장 데이터 (이력서 PDF 정독 기반) — 이력서 텍스트에 [경력 이력]이 없어도 표시
 const CAREER_BUILTIN = {
   "오세현": {
+    birth: 1993, edu: "성사고 졸업(문과, 2012) — 프로필상 대학 학력 미기재 · 면접 확인",
     header: "표기 6년 — ⚠ 최근 3개사 연속 단기",
     rows: [
       { current: true, company: "현재 무직", role: "오비랩 퇴사 후 구직 중", since: "2026.02" },
@@ -1360,6 +1361,7 @@ const CAREER_BUILTIN = {
     note: "안정 근속은 첫 회사 4년뿐. 이후 5개월→1년1개월→9개월 반복 — 면접 검증 1순위",
   },
   "박현철": {
+    birth: 1990, edu: "중앙대학교 광고홍보학 학사 (2009~2018)",
     header: "총 9년 (8개사) — ⚠ 단기 3회 + 현직 7개월째 이직 시도",
     rows: [
       { company: "Anti-aging Club", role: "팀장 / 헬스케어", period: "2025.11~재직중", dur: "7개월", work: "헬스케어 브랜드 마케팅 총괄 — 광고→상담→재방문 풀퍼널, 의료광고 심의 리스크 대응, Moloco 테스트" },
@@ -1373,6 +1375,7 @@ const CAREER_BUILTIN = {
     note: "버핏서울 3년3개월(분기 목표 7회 초과)이 유일한 장기. 3·4·7개월 단기 사유를 개별 확인",
   },
   "이찬우": {
+    birth: 1990, edu: "학점은행제 경영학 학사(2022) · 청강문화산업대 이동통신 전문학사",
     header: "6년 (마케팅 실질 약 6년 3개월) — ✅ 4인 중 근속 최상",
     rows: [
       { company: "앨트웰(주)", role: "마케팅 (건기식·생활용품·다이어트)", period: "2023.03~재직중", dur: "3년 6개월 ★", work: "프로모션 기획~손익·매출 분석(누적 28.31억), 교육·홍보 영상 200편+, 오픈톡·밴드 커뮤니티 운영, AI 소재 실무 적용" },
@@ -1384,6 +1387,7 @@ const CAREER_BUILTIN = {
     note: "마케팅 경력 전체가 2~3년대 안정 근속. 공백 8개월(2022)만 확인",
   },
   "박보현": {
+    birth: 1995, edu: "미국 Univ. of Illinois Urbana-Champaign (Tilton School — 유학 약 10년)",
     header: "3년 (3개사) — 모두 1년 이상, 조기 이탈 패턴 없음",
     rows: [
       { company: "Treasurer", role: "IMC 마케팅·서비스기획", period: "2024.12~재직중", dur: "1년 8개월", work: "온보딩~리텐션 퍼널 재정의, RFM·K-Means 세그먼트, SQL·Looker 대시보드, Make·n8n 자동화" },
@@ -1412,6 +1416,20 @@ function InterviewResumeCard({ candidate }) {
   return (
     <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, color: C.sub, marginBottom: 6 }}>📄 이력서 · 경력사항 <span style={{ fontWeight: 400, fontSize: 10.5, color: C.muted }}>· 면접실에서 바로 확인</span></div>
+      {(() => {
+        const bi = CAREER_BUILTIN[(candidate.name || "").trim()];
+        const birth = bi?.birth;
+        const edu = bi?.edu;
+        if (!birth && !edu && !candidate.age) return null;
+        const chip = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: C.text, background: C.surface, border: `1px solid ${C.border}`, padding: "3px 9px", borderRadius: 9 };
+        return (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 7 }}>
+            {birth ? <span style={chip}>🎂 {birth}년생 · 만 {new Date().getFullYear() - birth}세</span>
+              : candidate.age ? <span style={chip}>🎂 {candidate.age}세</span> : null}
+            {edu && <span style={{ ...chip, maxWidth: "100%" }}>🎓 {edu}</span>}
+          </div>
+        );
+      })()}
       {meta["최근 경력"] && <div style={{ fontSize: 11.5, color: C.sub, marginBottom: 8, lineHeight: 1.5 }}>{meta["최근 경력"]}{meta["연봉"] ? ` · 연봉 ${meta["연봉"]}` : ""}</div>}
       {career ? (<>
         {career.header && <div style={{ fontSize: 11, fontWeight: 700, color: career.header.includes("⚠") ? C.red : career.header.includes("✅") ? C.green : C.muted, marginBottom: 6 }}>{career.header}</div>}
