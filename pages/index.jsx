@@ -1338,9 +1338,57 @@ function durMonths(d) {
   const y = /(\d+)\s*년/.exec(d); const m = /(\d+)\s*개월/.exec(d);
   return (y ? +y[1] * 12 : 0) + (m ? +m[1] : 0);
 }
+// 면접 후보 경력사항 내장 데이터 (이력서 PDF 정독 기반) — 이력서 텍스트에 [경력 이력]이 없어도 표시
+const CAREER_BUILTIN = {
+  "오세현": {
+    header: "표기 6년 — ⚠ 최근 3개사 연속 단기",
+    rows: [
+      { company: "오비랩(OviLab)", role: "Growth & Tech Lead", period: "2025.06~2026.02", dur: "9개월 ⚠" },
+      { gap: true, label: "공백 2026.02~ 현재 6개월 (퇴사 후)" },
+      { gap: true, label: "공백 2025.03~2025.06 · 3개월" },
+      { company: "비오스드림", role: "Growth Marketing Lead", period: "2024.02~2025.03", dur: "1년 1개월" },
+      { company: "아이마이미마인(IMYMEMINE)", role: "Commerce Operation Manager", period: "2023.10~2024.02", dur: "5개월 ⚠" },
+      { company: "대한금융지원센터", role: "Digital Marketer", period: "2019.11~2023.10", dur: "4년 ★" },
+    ],
+    note: "안정 근속은 첫 회사 4년뿐. 이후 5개월→1년1개월→9개월 반복 — 면접 검증 1순위",
+  },
+  "박현철": {
+    header: "총 9년 (8개사) — ⚠ 단기 3회 + 현직 7개월째 이직 시도",
+    rows: [
+      { company: "Anti-aging Club", role: "팀장 / 헬스케어", period: "2025.11~재직중", dur: "7개월" },
+      { company: "(주)버핏서울", role: "영업기획실 / 마케팅 PM", period: "2022.09~2025.11", dur: "3년 3개월 ★" },
+      { company: "Biginsight", role: "팀장 / Adops", period: "2022.05~2022.08", dur: "4개월 ⚠" },
+      { company: "taggers.io", role: "Business Group Leader", period: "2020.07~2022.05", dur: "1년 11개월" },
+      { company: "(주)세븐헌드레드", role: "캠페인팀 대리", period: "2020.04~2020.06", dur: "3개월 ⚠" },
+      { company: "(주)에코마케팅", role: "계약직 / 구글전문그룹", period: "2019.05~2019.11", dur: "7개월" },
+      { company: "HS애드 · 한컴", role: "인턴 2회", period: "2014.03~2015.06", dur: "8개월·4개월" },
+    ],
+    note: "버핏서울 3년3개월(분기 목표 7회 초과)이 유일한 장기. 3·4·7개월 단기 사유를 개별 확인",
+  },
+  "이찬우": {
+    header: "6년 (마케팅 실질 약 6년 3개월) — ✅ 4인 중 근속 최상",
+    rows: [
+      { company: "앨트웰(주)", role: "마케팅 (건기식·생활용품·다이어트)", period: "2023.03~재직중", dur: "3년 6개월 ★" },
+      { gap: true, label: "공백 2022.07~2023.03 · 8개월" },
+      { company: "(주)앤알커뮤니케이션", role: "마케팅기획 (화장품·이너뷰티)", period: "2019.11~2022.07", dur: "2년 9개월" },
+      { company: "(주)삼구아이앤씨", role: "유지보수팀 (비마케팅)", period: "2018.03~2019.06", dur: "1년 4개월" },
+      { company: "(주)엘지유플러스", role: "영업 (비마케팅)", period: "2014.11~2016.11", dur: "2년 1개월" },
+    ],
+    note: "마케팅 경력 전체가 2~3년대 안정 근속. 공백 8개월(2022)만 확인",
+  },
+  "박보현": {
+    header: "3년 (3개사) — 모두 1년 이상, 조기 이탈 패턴 없음",
+    rows: [
+      { company: "Treasurer", role: "IMC 마케팅·서비스기획", period: "2024.12~재직중", dur: "1년 8개월" },
+      { company: "NextPaper M&C", role: "디지털 마케팅", period: "2023.03~2024.12", dur: "1년 10개월" },
+      { company: "FROMHERAS", role: "전략기획", period: "2022.02~2023.03", dur: "1년 1개월" },
+    ],
+    note: "연차는 짧지만 근속 리듬은 건강. 직전·현직 연속(이직 준비 겹침 여부만 확인)",
+  },
+};
 function InterviewResumeCard({ candidate }) {
   const [copied, setCopied] = useState(null);
-  const career = parseCareerRows(candidate.resume);
+  const career = parseCareerRows(candidate.resume) || CAREER_BUILTIN[(candidate.name || "").trim()] || null;
   const refs = candidate.fileRefs || [];
   const meta = {};
   (candidate.resume || "").split("\n").forEach(l => {
