@@ -956,7 +956,7 @@ function ConditionsCard({ candidate, onUpdate }) {
         {START_PRESETS.map(p => <button key={p} onClick={() => save({ start: cond.start === p ? "" : p })} style={chip(cond.start === p)}>{p}</button>)}
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-        <input value={custom.start} onChange={e => setCustom(s => ({ ...s, start: e.target.value }))} onKeyDown={e => { if (e.key === "Enter" && custom.start.trim()) { save({ start: custom.start.trim() }); setCustom(s => ({ ...s, start: "" })); } }} placeholder="직접 입력 (예: 9월 초) 후 Enter" style={{ flex: 1, padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+        <input value={custom.start} onChange={e => setCustom(s => ({ ...s, start: e.target.value }))} onKeyDown={e => { if (e.key === "Enter" && custom.start.trim()) { save({ start: custom.start.trim() }); setCustom(s => ({ ...s, start: "" })); } }} onBlur={() => { if (custom.start.trim()) { save({ start: custom.start.trim() }); setCustom(s => ({ ...s, start: "" })); } }} placeholder="직접 입력 (예: 9월 초) — 입력하면 자동 저장" style={{ flex: 1, padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
         {cond.start && !START_PRESETS.includes(cond.start) && <span style={{ ...chip(true), cursor: "default" }}>{cond.start}</span>}
       </div>
       <div style={{ fontSize: 11.5, fontWeight: 600, color: C.muted, marginBottom: 6 }}>희망 연봉 (만원)</div>
@@ -964,7 +964,7 @@ function ConditionsCard({ candidate, onUpdate }) {
         {SALARY_PRESETS.map(p => <button key={p} onClick={() => save({ salary: cond.salary === p ? "" : p })} style={chip(cond.salary === p)}>{p}</button>)}
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-        <input value={custom.salary} onChange={e => setCustom(s => ({ ...s, salary: e.target.value }))} onKeyDown={e => { if (e.key === "Enter" && custom.salary.trim()) { save({ salary: custom.salary.trim() }); setCustom(s => ({ ...s, salary: "" })); } }} placeholder="직접 입력 (예: 5,200 또는 4,800~5,300) 후 Enter" style={{ flex: 1, padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
+        <input value={custom.salary} onChange={e => setCustom(s => ({ ...s, salary: e.target.value }))} onKeyDown={e => { if (e.key === "Enter" && custom.salary.trim()) { save({ salary: custom.salary.trim() }); setCustom(s => ({ ...s, salary: "" })); } }} onBlur={() => { if (custom.salary.trim()) { save({ salary: custom.salary.trim() }); setCustom(s => ({ ...s, salary: "" })); } }} placeholder="직접 입력 (예: 5,200 또는 4,800~5,300) — 입력하면 자동 저장" style={{ flex: 1, padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 12, fontFamily: "inherit", outline: "none" }} />
         {cond.salary && !SALARY_PRESETS.includes(cond.salary) && <span style={{ ...chip(true), cursor: "default" }}>{cond.salary}</span>}
       </div>
       <input value={cond.note || ""} onChange={e => save({ note: e.target.value })} placeholder="조건 메모 (예: 현 직장 인수인계 2주, 스톡옵션 관심)" style={{ width: "100%", padding: "7px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.surface, color: C.text, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
