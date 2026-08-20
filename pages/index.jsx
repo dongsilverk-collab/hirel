@@ -1640,7 +1640,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
   useEffect(() => () => { recogRef.current?.stop(); clearInterval(timerRef.current); }, []);
 
   const IS = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "9px 13px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
-  const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 8, color: "#fff", padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" });
+  const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 8, color: "#fff", padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" });
 
   return (
     <div>
@@ -1849,7 +1849,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
   const fb = candidate.interviewFeedback;
   const a = candidate.analysis;
   const rc = ROLE_COLORS[position?.colorIdx || 0];
-  const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 8, color: "#fff", padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" });
+  const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 8, color: "#fff", padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" });
   const IS = { width: "100%", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "10px 13px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
   const Card = { background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 18 };
 
@@ -2266,10 +2266,10 @@ function FileRefsSection({ candidate, onUpdate, showToast }) {
             </div>
           ))}
         </div>}
-      <div style={{ display: "flex", gap: 6 }}>
-        <input value={fname} onChange={e => setFname(e.target.value)} placeholder="파일명 (예: 포트폴리오.pdf)" style={{ ...IS2, flex: "0 0 190px" }} />
-        <input value={fpath} onChange={e => setFpath(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder={"경로 (예: \\\\NAS\\채용\\홍길동\\포트폴리오.pdf)"} style={{ ...IS2, flex: 1 }} />
-        <button onClick={add} style={{ background: `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 7, color: "#fff", padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>추가</button>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <input value={fname} onChange={e => setFname(e.target.value)} placeholder="파일명 (예: 포트폴리오.pdf)" style={{ ...IS2, flex: "1 0 160px" }} />
+        <input value={fpath} onChange={e => setFpath(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} placeholder={"경로 (예: \\\\NAS\\채용\\홍길동\\포트폴리오.pdf)"} style={{ ...IS2, flex: "2 0 200px" }} />
+        <button onClick={add} style={{ background: `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 7, color: "#fff", padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}>추가</button>
       </div>
     </div>
   );
@@ -2647,7 +2647,7 @@ export default function HireL() {
   };
 
   const IS = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "10px 13px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
-  const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 9, color: "#fff", padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" });
+  const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 9, color: "#fff", padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" });
   const vStyle = (v) => ({ "추천": { color: C.green, bg: "rgba(16,185,129,.1)", border: "rgba(16,185,129,.3)" }, "검토필요": { color: C.amber, bg: "rgba(245,158,11,.1)", border: "rgba(245,158,11,.3)" }, "부적합": { color: C.red, bg: "rgba(239,68,68,.1)", border: "rgba(239,68,68,.3)" } }[v] || { color: C.sub, bg: C.card, border: C.border });
 
   const updateCandidate = (id, patch) => {
@@ -3160,26 +3160,26 @@ export default function HireL() {
               const rc = ROLE_COLORS[pos?.colorIdx || 0];
               return (
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
-                    <button onClick={() => setView("dashboard")} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 13px", color: C.sub, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>← 목록</button>
-                    <div style={{ width: 46, height: 46, borderRadius: 12, background: `${rc.accent}25`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, fontWeight: 800, color: rc.accent }}>{c.name[0]}</div>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>{c.name}</h2>
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 14, rowGap: 10, marginBottom: 24 }}>
+                    <button onClick={() => setView("dashboard")} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 13px", color: C.sub, cursor: "pointer", fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}>← 목록</button>
+                    <div style={{ width: 46, height: 46, borderRadius: 12, background: `${rc.accent}25`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, fontWeight: 800, color: rc.accent, flexShrink: 0 }}>{c.name[0]}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 9, rowGap: 5 }}>
+                        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0, whiteSpace: "nowrap" }}>{c.name}</h2>
                         <StarButton on={!!c.starred} onToggle={() => toggleStar(c.id)} size={20} />
-                        <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 14, background: `${rc.accent}20`, border: `1px solid ${rc.accent}40`, color: rc.accent, fontWeight: 600 }}>{pos?.name}</span>
+                        <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 14, background: `${rc.accent}20`, border: `1px solid ${rc.accent}40`, color: rc.accent, fontWeight: 600, whiteSpace: "nowrap" }}>{pos?.name}</span>
                         <ChannelBadge channel={c.channel} />
-                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 12, background: `${STAGE_COLORS[c.stage || "서류검토"]}18`, border: `1px solid ${STAGE_COLORS[c.stage || "서류검토"]}40`, color: STAGE_COLORS[c.stage || "서류검토"], fontWeight: 600 }}>{c.stage || "서류검토"}</span>
+                        <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 12, background: `${STAGE_COLORS[c.stage || "서류검토"]}18`, border: `1px solid ${STAGE_COLORS[c.stage || "서류검토"]}40`, color: STAGE_COLORS[c.stage || "서류검토"], fontWeight: 600, whiteSpace: "nowrap" }}>{c.stage || "서류검토"}</span>
                       </div>
                       <div style={{ fontSize: 12, color: C.sub }}>{c.age ? `${c.age}세` : ""}{attachCount(c) > 0 && <span style={{ marginLeft: 8 }}>📎{attachCount(c)} · {[...(c.fileNames || []), ...((c.fileRefs || []).map(r => r.name))].join(", ")}</span>}</div>
                     </div>
                     {a && !busy && (
-                      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ textAlign: "center" }}>
+                      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, rowGap: 8 }}>
+                        <div style={{ textAlign: "center", flexShrink: 0 }}>
                           <div style={{ fontSize: 28, fontWeight: 800, color: sc(a.totalScore), fontFamily: "'DM Mono',monospace" }}>{a.totalScore}</div>
-                          <div style={{ fontSize: 11, color: C.sub }}>종합 점수</div>
+                          <div style={{ fontSize: 11, color: C.sub, whiteSpace: "nowrap" }}>종합 점수</div>
                         </div>
-                        <div style={{ padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 700, background: vStyle(a.verdict).bg, border: `1px solid ${vStyle(a.verdict).border}`, color: vStyle(a.verdict).color }}>{a.verdict}</div>
+                        <div style={{ padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 700, background: vStyle(a.verdict).bg, border: `1px solid ${vStyle(a.verdict).border}`, color: vStyle(a.verdict).color, whiteSpace: "nowrap" }}>{a.verdict}</div>
                         <button onClick={() => exportCandidatePDF(c, pos)} style={{ ...BP(`linear-gradient(135deg,#64748B,#475569)`), padding: "8px 14px", fontSize: 13 }}>📄 PDF 저장</button>
                         <button onClick={() => { setInterviewCandidateId(c.id); setView("interview"); }} style={{ ...BP(`linear-gradient(135deg,${C.purple},${C.pink})`), padding: "8px 14px", fontSize: 13 }}>🎤 면접 시작</button>
                         <button onClick={() => doAnalyze(c)} style={{ ...BP(), padding: "8px 14px", fontSize: 13 }}>재분석</button>
