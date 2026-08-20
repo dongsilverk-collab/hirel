@@ -1327,6 +1327,33 @@ function ConditionsCard({ candidate, onUpdate }) {
   );
 }
 
+// ─── 녹음 저장 폴더 (File System Access API + IndexedDB 핸들 보관) ─────────────
+// 한 번 'Y:\본부\인사\마케터채용\03_면접녹음' 지정해두면 이후 녹음이 그 폴더에 바로 저장됨
+function idbKV(mode, key, val) {
+  return new Promise((res) => {
+    try {
+      const rq = indexedDB.open("hirel_fs", 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore("kv");
+      rq.onerror = () => res(null);
+      rq.onsuccess = () => {
+        try {
+          const tx = rq.result.transaction("kv", mode === "get" ? "readonly" : "readwrite");
+          const st = tx.objectStore("kv");
+          if (mode === "get") { const g = st.get(key); g.onsuccess = () => res(g.result || null); g.onerror = () => res(null); }
+          else { st.put(val, key); tx.oncomplete = () => res(true); tx.onerror = () => res(null); }
+        } catch (e) { res(null); }
+      };
+    } catch (e) { res(null); }
+  });
+}
+async function ensureRecDirPermission(handle) {
+  if (!handle) return false;
+  try {
+    if ((await handle.queryPermission({ mode: "readwrite" })) === "granted") return true;
+    return (await handle.requestPermission({ mode: "readwrite" })) === "granted";
+  } catch (e) { return false; }
+}
+
 // ─── 면접실 이력서 카드: 사람인 형식 경력사항 표 + 원본 PDF 경로 + 원문 ────────
 function parseCareerRows(resume) {
   const lines = (resume || "").split("\n");
@@ -1526,6 +1553,76 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
   const [lastScoredLen, setLastScoredLen] = useState(0);
   const [silenceTimer, setSilenceTimer] = useState(null);
   const recogRef = useRef(null);
+  // ─── 음성 파일 녹음 (STT와 병행, 중지 시 .webm 자동 다운로드) ────────────────
+  const mediaRecRef = useRef(null);
+  const recChunksRef = useRef([]);
+  const audioStreamRef = useRef(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [audioName, setAudioName] = useState("");
+  const [audioSaving, setAudioSaving] = useState(false);
+  const [recDirName, setRecDirName] = useState("");
+  const [savedWhere, setSavedWhere] = useState("");
+  const recDirRef = useRef(null);
+  useEffect(() => { idbKV("get", "recDir").then(h => { if (h) { recDirRef.current = h; setRecDirName(h.name); } }); }, []);
+  const pickRecFolder = async () => {
+    try {
+      if (!window.showDirectoryPicker) { alert("이 브라우저는 폴더 저장을 지원하지 않습니다 (Chrome/Edge 데스크톱 필요). 녹음은 다운로드 폴더에 저장됩니다."); return; }
+      const h = await window.showDirectoryPicker({ mode: "readwrite" });
+      recDirRef.current = h; setRecDirName(h.name);
+      await idbKV("set", "recDir", h);
+    } catch (e) { /* 사용자가 취소 */ }
+  };
+  const startAudioRec = async () => {
+    try {
+      // 녹음 시작 시(사용자 클릭 제스처 안에서) 폴더 권한 미리 확보
+      if (recDirRef.current) await ensureRecDirPermission(recDirRef.current);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = stream;
+      const mr = new MediaRecorder(stream);
+      recChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) recChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        try {
+          const blob = new Blob(recChunksRef.current, { type: "audio/webm" });
+          if (blob.size > 2000) {
+            const url = URL.createObjectURL(blob);
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            const fname = `면접녹음_${candidate.name}_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.webm`;
+            setAudioUrl(p => { if (p) URL.revokeObjectURL(p); return url; });
+            setAudioName(fname);
+            // 1순위: 지정 폴더(Y:\...\03_면접녹음)에 직접 저장 / 실패 시 다운로드 폴백
+            let saved = false;
+            const dir = recDirRef.current;
+            if (dir && await ensureRecDirPermission(dir)) {
+              try {
+                const fh = await dir.getFileHandle(fname, { create: true });
+                const w = await fh.createWritable();
+                await w.write(blob); await w.close();
+                saved = true;
+                setSavedWhere(`${dir.name} 폴더에 저장됨`);
+              } catch (e) { console.warn("폴더 저장 실패 → 다운로드 폴백", e); }
+            }
+            if (!saved) {
+              const a = document.createElement("a");
+              a.href = url; a.download = fname; a.click();
+              setSavedWhere("다운로드 폴더에 저장됨 — Y:\\본부\\인사\\마케터채용\\03_면접녹음\\으로 이동 보관");
+            }
+          }
+        } catch (e) { console.error(e); }
+        audioStreamRef.current?.getTracks().forEach(t => t.stop());
+        audioStreamRef.current = null;
+        setAudioSaving(false);
+      };
+      mr.start(1000);
+      mediaRecRef.current = mr;
+      setAudioSaving(true);
+    } catch (e) { console.warn("음성 녹음 불가(권한 거부?) — 녹취록만 진행", e); }
+  };
+  const stopAudioRec = () => {
+    if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") mediaRecRef.current.stop();
+    mediaRecRef.current = null;
+  };
   const timerRef = useRef(null);
   const txRef = useRef("");
   const scoringRef = useRef(false);
@@ -1628,16 +1725,18 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
     };
     r.onend = () => { if (recogRef.current === r) r.start(); };
     r.start(); recogRef.current = r; setRecording(true);
+    startAudioRec();
     timerRef.current = setInterval(() => setElapsed(p => p + 1), 1000);
   };
   const stop = () => {
     recogRef.current?.stop(); recogRef.current = null;
+    stopAudioRec();
     clearInterval(timerRef.current);
     setRecording(false); setInterim("");
     if (txRef.current.trim().length > 30) doScore(txRef.current);
   };
   const addNote = () => { if (!noteInput.trim()) return; setNotes(p => [...p, { text: noteInput, t: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) }]); setNoteInput(""); };
-  useEffect(() => () => { recogRef.current?.stop(); clearInterval(timerRef.current); }, []);
+  useEffect(() => () => { recogRef.current?.stop(); clearInterval(timerRef.current); try { if (mediaRecRef.current && mediaRecRef.current.state !== "inactive") mediaRecRef.current.stop(); } catch (e) {} audioStreamRef.current?.getTracks().forEach(t => t.stop()); }, []);
 
   const IS = { width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text, padding: "9px 13px", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
   const BP = (bg) => ({ background: bg || `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 8, color: "#fff", padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" });
@@ -1716,12 +1815,22 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>🎙 실시간 녹취록</span>
                 {recording && <div style={{ width: 7, height: 7, borderRadius: "50%", background: C.red, animation: "pulse 1.2s ease infinite" }} />}
+                {audioSaving && <span style={{ fontSize: 10.5, fontWeight: 700, color: C.red, background: "#FEF2F2", border: `1px solid ${C.red}35`, padding: "2px 8px", borderRadius: 10, whiteSpace: "nowrap" }}>● 음성 파일 녹음 중 — 중지하면 자동 저장</span>}
+                <button onClick={pickRecFolder} title="녹음 파일을 저장할 폴더 지정 — Y:\본부\인사\마케터채용\03_면접녹음 권장" style={{ fontSize: 10.5, fontWeight: 600, color: recDirName ? C.green : C.sub, background: "transparent", border: `1px solid ${recDirName ? `${C.green}45` : C.borderL}`, padding: "2px 9px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>📁 {recDirName ? `저장: ${recDirName}` : "저장 폴더 지정"}</button>
               </div>
               <div style={{ display: "flex", gap: 7 }}>
                 <button onClick={() => doScore(transcript)} disabled={scoring || !transcript} style={{ ...BP(), padding: "5px 12px", fontSize: 12, opacity: (!transcript || scoring) ? .4 : 1 }}>{scoring ? "평가 중..." : "⚡ 지금 평가"}</button>
                 <button onClick={() => { setTranscript(""); setInterim(""); }} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 9px", color: C.sub, cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>초기화</button>
               </div>
             </div>
+            {audioUrl && (
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, padding: "8px 11px", background: "rgba(16,185,129,.07)", border: "1px solid rgba(16,185,129,.3)", borderRadius: 9, marginBottom: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.green, whiteSpace: "nowrap" }}>🎧 녹음 파일 저장됨</span>
+                <audio controls src={audioUrl} style={{ height: 30, flex: 1, minWidth: 160 }} />
+                <a href={audioUrl} download={audioName} style={{ fontSize: 11, fontWeight: 700, color: C.accent, textDecoration: "none", whiteSpace: "nowrap", border: `1px solid ${C.accent}40`, borderRadius: 7, padding: "4px 10px", background: C.glow }}>다시 다운로드</a>
+                <span style={{ fontSize: 10, color: C.muted, width: "100%" }}>{audioName} — {savedWhere || "저장됨"} · (녹음 사실은 면접자에게 사전 고지)</span>
+              </div>
+            )}
             <div style={{ minHeight: 180, maxHeight: 280, overflowY: "auto" }}>
               {transcript ? <p style={{ fontSize: 14, color: C.text, lineHeight: 1.85, margin: 0, whiteSpace: "pre-wrap" }}>{transcript}<span style={{ color: C.muted, fontStyle: "italic" }}>{interim}</span></p>
                 : <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 160, gap: 9 }}>
