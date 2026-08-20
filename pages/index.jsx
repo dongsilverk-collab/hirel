@@ -1324,7 +1324,8 @@ ${(candidate.resume || "").slice(0, 1500)}
     try {
       const apiMsgs = next.map(m => ({ role: m.role === "q" ? "user" : "assistant", content: m.text }));
       const r = await callAI({ system: sysPrompt, messages: apiMsgs, max_tokens: 1200 });
-      setMsgs(p => [...p, { role: "a", text: r?.content?.[0]?.text || "(응답 없음)" }]);
+      const answer = (r?.content || []).map(b => b?.text || "").join("").trim();
+      setMsgs(p => [...p, { role: "a", text: answer || "(응답 없음)" }]);
     } catch (e) {
       setMsgs(p => [...p, { role: "a", text: "⚠ AI 호출 실패 — 잠시 후 다시 시도해 주세요" }]);
     }
