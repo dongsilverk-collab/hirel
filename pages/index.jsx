@@ -1323,7 +1323,7 @@ ${(candidate.resume || "").slice(0, 1500)}
     setMsgs(next); setInput(""); setBusy(true);
     try {
       const apiMsgs = next.map(m => ({ role: m.role === "q" ? "user" : "assistant", content: m.text }));
-      const r = await callAI({ system: sysPrompt, messages: apiMsgs, max_tokens: 1200 });
+      const r = await callAI({ system: sysPrompt, messages: apiMsgs, max_tokens: 2500 });
       const answer = (r?.content || []).map(b => b?.text || "").join("").trim();
       setMsgs(p => [...p, { role: "a", text: answer || "(응답 없음)" }]);
     } catch (e) {
