@@ -1341,11 +1341,14 @@ ${(candidate.resume || "").slice(0, 1500)}
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "300px 1fr", gap: 14, alignItems: "start" }}>
-        <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 14, maxHeight: isMobile ? 220 : "calc(100vh - 220px)", overflowY: "auto" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: isMobile ? undefined : "calc(100vh - 200px)", overflowY: isMobile ? undefined : "auto" }}>
+        <FocusCard candidate={candidate} compact />
+        <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 14, maxHeight: isMobile ? 220 : undefined, overflowY: isMobile ? "auto" : undefined }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, marginBottom: 8 }}>📋 킷 질문 — 클릭하면 바로 물어봅니다</div>
           {kitQs.length ? kitQs.map((q, i) => (
             <div key={i} onClick={() => ask(q)} style={{ fontSize: 11.5, color: C.text, lineHeight: 1.5, padding: "7px 9px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 5, cursor: busy ? "wait" : "pointer", opacity: busy ? .5 : 1 }}>{q}</div>
           )) : <div style={{ fontSize: 11.5, color: C.muted }}>킷 질문 없음 — 오른쪽에 직접 입력</div>}
+        </div>
         </div>
         <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16, display: "flex", flexDirection: "column", minHeight: 420 }}>
           <div ref={logRef} style={{ flex: 1, overflowY: "auto", maxHeight: "calc(100vh - 320px)", minHeight: 300, paddingRight: 4 }}>
@@ -1522,6 +1525,65 @@ const CAREER_BUILTIN = {
     note: "연차는 짧지만 근속 리듬은 건강. 직전·현직 연속(이직 준비 겹침 여부만 확인)",
   },
 };
+// ─── 🎯 후보별 면접 중점 포인트 (면접키트 v2·검토 보고서 기반) ─────────────────
+const FOCUS_BUILTIN = {
+  "오세현": {
+    verdict: "판정 기준: 과제 통과 전제 채용 추천 — ❌ Red Flag 2개면 탈락",
+    points: [
+      ["⚠ 공백 6개월 + 최근 3개사 연속 단기", "이직 '패턴'인지 사유가 납득되는지 — 회사 탓만 반복하면 Red Flag"],
+      ["⚠ 수치 정직성", "매출 12배 vs 17배 불일치 — 기준을 즉시 설명하고 본인 기여를 분리하는가"],
+      ["AI 만능주의 여부", "암 환우 브랜드의 '진짜 사람의 진심' 톤 — AI 한계를 인정하고 검수 설계를 말하는가"],
+      ["반복 업무 수용도", "블로그·인스타 반복 업무 30% — '다 좋습니다' 식 무조건 수용은 신뢰 낮음"],
+    ],
+  },
+  "박현철": {
+    verdict: "판정 기준: 연봉·역할 수용 시 채용 추천 — 1번에서 갈리면 정중히 조기 종료",
+    points: [
+      ["🔑 연봉 7,000 → 5,500 수용 (최초반 확인)", "유일한 실질 관문 — '일단 들어가서 조정' 뉘앙스면 종료"],
+      ["실무 복귀 진정성", "팀장 9년차가 직접 손으로 — 최근 3개월 내 '직접 세팅' 사례가 구체적인가"],
+      ["⚠ 단기 3회(3·4·7개월) + 현직 7개월", "패턴 자각이 있는가"],
+      ["심의 게이트 역량", "걸러낸 표현 실사례+대체 표현이 나오면 심의 게이트 역할 확정 (가점)"],
+    ],
+  },
+  "이찬우": {
+    verdict: "판정 기준: 매체 직접 운영 확인되면 채용 추천 — 아니면 소재제작 역할로 재검토",
+    points: [
+      ["🔑 매체 광고 직접 운영 증거 (핵심 관문)", "포트폴리오가 오픈톡·밴드 중심 — 메타·네이버 계정을 직접 세팅·운영했는가. 용어가 겉돌면 ①전환형 부적합"],
+      ["기여 분리", "누적 매출 28.31억에서 본인 담당을 분리해 말하는가"],
+      ["심의 감각", "건기식 3년 6개월인데 심의 사례가 안 나오면 감점 (역할이 무관했을 가능성)"],
+      ["✅ 근속 최상은 강점", "이직 사유(성장·역할 확장)가 합리적인지만 확인 — 희망 4,000도 유리"],
+    ],
+  },
+  "박보현": {
+    verdict: "판정 기준: 지금 채용 아님 — '③CRM 풀 A급' 여부만 판정 (좋아도 풀 보관)",
+    points: [
+      ["🔑 포지셔닝 주의", "①전환형 기준으로 보면 무조건 탈락 — datarize 고도화 시점의 CRM 카드인지 검증하는 자리"],
+      ["분석→실행→성과 연결", "RFM·세그먼트가 캠페인 실행과 매출 변화로 이어졌는가 (방법론 설명만 길면 감점)"],
+      ["소재 약점 인정", "업무 절반이 소재 제작 — 약점을 인정하고 기여 그림을 그리는가"],
+      ["규제 인지", "더마(세타필)→건기식 규제 차이를 아는가"],
+    ],
+  },
+};
+function FocusCard({ candidate, compact }) {
+  const f = FOCUS_BUILTIN[(candidate.name || "").trim()];
+  if (!f) return null;
+  return (
+    <div style={{ background: "#FFF9EC", borderRadius: 13, border: "1px solid #F1DFAE", boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: compact ? 12 : 16 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: "#92600A", marginBottom: 8 }}>🎯 이 면접의 중점 포인트 — {candidate.name}</div>
+      {f.points.map(([t, d], i) => (
+        <div key={i} style={{ display: "flex", gap: 8, marginBottom: 7, alignItems: "flex-start" }}>
+          <span style={{ minWidth: 18, height: 18, borderRadius: 5, background: "#F3E3B8", color: "#92600A", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 800 }}>{i + 1}</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: compact ? 11.5 : 12.5, fontWeight: 700, color: C.text, lineHeight: 1.4 }}>{t}</div>
+            <div style={{ fontSize: compact ? 10.5 : 11.5, color: C.sub, lineHeight: 1.5 }}>{d}</div>
+          </div>
+        </div>
+      ))}
+      <div style={{ fontSize: compact ? 10.5 : 11.5, fontWeight: 700, color: "#92600A", marginTop: 9, paddingTop: 8, borderTop: "1px solid #F1DFAE" }}>{f.verdict}</div>
+    </div>
+  );
+}
+
 // 회사명 → 사람인 기업정보 검색 (재무 정보는 검색 결과에서 회사 클릭 → 기업정보·재무 탭)
 const saraminCompanyUrl = (name) => {
   const clean = (name || "").replace(/\(주\)|㈜/g, "").split("(")[0].split("·")[0].trim();
@@ -1623,7 +1685,7 @@ function InterviewResumeCard({ candidate }) {
   );
 }
 
-function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
+function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate, onSim }) {
   const isMobile = useIsMobile();
   const rc = ROLE_COLORS[position?.colorIdx || 0];
   const [recording, setRecording] = useState(false);
@@ -1848,6 +1910,9 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
               <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#fff", display: "inline-block" }} />녹음 시작</button>
             : <button onClick={stop} style={{ ...BP(`linear-gradient(135deg,${C.red},#b91c1c)`), display: "flex", alignItems: "center", gap: 7 }}>
               <span style={{ width: 9, height: 9, borderRadius: 2, background: "#fff", display: "inline-block" }} />녹음 중지</button>}
+          {onSim && (
+            <button onClick={onSim} title="AI가 이 후보를 연기 — 예상 답변 리허설 (실제 면접 전 연습용)" style={{ background: "transparent", border: `1px solid ${C.purple}45`, borderRadius: 8, color: C.purple, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>🎭 시뮬</button>
+          )}
           {candidate.analysis && (
             <button onClick={() => exportCandidatePDF(candidate, position)} style={{ ...BP(`linear-gradient(135deg,#64748B,#475569)`), display: "flex", alignItems: "center", gap: 7 }}>
               📄 PDF 저장</button>
@@ -1859,6 +1924,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
 
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 370px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <FocusCard candidate={candidate} />
           <EvpScriptCard />
           <GrayAreaBanner candidate={candidate} />
           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
@@ -3054,7 +3120,7 @@ export default function HireL() {
             <span style={{ fontSize: 12, color: C.muted }}>면접 진행 중 · {interviewPosition?.name}</span>
           </div>
           <div style={{ maxWidth: 1160, margin: "0 auto", padding: isMobile ? "16px 12px" : "24px 28px" }}>
-            <InterviewRoom candidate={interviewCandidate} position={interviewPosition} onBack={() => { setView("detail"); setSelectedCandidateId(interviewCandidateId); }} onFinish={(t) => finishInterview(interviewCandidate, interviewPosition, t)} onUpdate={(patch) => updateCandidate(interviewCandidate.id, patch)} />
+            <InterviewRoom candidate={interviewCandidate} position={interviewPosition} onBack={() => { setView("detail"); setSelectedCandidateId(interviewCandidateId); }} onFinish={(t) => finishInterview(interviewCandidate, interviewPosition, t)} onUpdate={(patch) => updateCandidate(interviewCandidate.id, patch)} onSim={() => { setSelectedCandidateId(interviewCandidate.id); setView("sim"); }} />
           </div>
         </div>
       </>
