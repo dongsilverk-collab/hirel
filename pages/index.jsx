@@ -1291,6 +1291,90 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
   );
 }
 
+// ─── 🎭 면접 시뮬레이션: AI가 지원자 역할 연기 (이력서·경력 그라운딩) ──────────
+function SimRoom({ candidate, position, onBack }) {
+  const isMobile = useIsMobile();
+  const [msgs, setMsgs] = useState([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const logRef = useRef(null);
+  useEffect(() => { logRef.current && (logRef.current.scrollTop = logRef.current.scrollHeight); }, [msgs, busy]);
+  const bi = CAREER_BUILTIN[(candidate.name || "").trim()];
+  const careerTxt = bi ? [bi.header, ...bi.rows.map(r => r.gap ? `(${r.label})` : `${r.company} · ${r.role} · ${r.period} · ${r.dur}${r.work ? ` — ${r.work}` : ""}`), "요약: " + (bi.note || "")].join("\n") : "";
+  const kitQs = (kitFor(candidate) || []).map(q => q.text);
+  const sysPrompt = `당신은 큐라엘(암 환우·회복기 환자 대상 건강식품 회사, 약사 대표, 마케팅팀 팀원 0명)의 마케터 채용에 지원한 지원자 "${candidate.name}" 역할을 연기합니다. 지원 포지션: ${position?.name || "마케터"}.
+
+[지원자 정보 — 아래 내용만이 사실의 근거입니다]
+${bi?.birth ? `출생: ${bi.birth}년생` : ""}${bi?.edu ? ` / 학력: ${bi.edu}` : ""}
+경력:
+${careerTxt || "(경력 상세 데이터 없음)"}
+이력서 요약:
+${(candidate.resume || "").slice(0, 1500)}
+
+[연기 규칙 — 반드시 지킬 것]
+1. 한국어 존댓말 면접 답변체. 실제 면접자처럼 2~6문장, 근거 있는 수치·사례를 인용.
+2. 위 정보에 근거가 있는 내용만 사실처럼 답한다. 근거 없는 내용을 답해야 하면 문장 끝에 "〔추정 — 이력서 근거 없음, 실제 면접에서 확인〕"을 붙인다.
+3. 약점 질문(짧은 근속·공백기·연봉 갭·직접 운영 경험 부족 등)에는 실제 지원자들이 흔히 쓰는 방어 패턴으로 현실감 있게 답한다 — 미화하거나 이상적으로 답하지 말 것.
+4. 답변 마지막 줄에 "💡면접관 팁: (이 답변에서 파고들 꼬리질문 1개)"를 붙인다.`;
+  const ask = async (q) => {
+    const text = (q || "").trim();
+    if (!text || busy) return;
+    const next = [...msgs, { role: "q", text }];
+    setMsgs(next); setInput(""); setBusy(true);
+    try {
+      const apiMsgs = next.map(m => ({ role: m.role === "q" ? "user" : "assistant", content: m.text }));
+      const r = await callAI({ system: sysPrompt, messages: apiMsgs, max_tokens: 1200 });
+      setMsgs(p => [...p, { role: "a", text: r?.content?.[0]?.text || "(응답 없음)" }]);
+    } catch (e) {
+      setMsgs(p => [...p, { role: "a", text: "⚠ AI 호출 실패 — 잠시 후 다시 시도해 주세요" }]);
+    }
+    setBusy(false);
+  };
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+        <button onClick={onBack} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 13px", color: C.sub, cursor: "pointer", fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap" }}>← 나가기</button>
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 800 }}>🎭 {candidate.name} · 예상 답변 시뮬레이션</div>
+          <div style={{ fontSize: 11.5, color: C.muted }}>AI가 이력서·경력만 근거로 지원자를 연기합니다 — 근거 없는 답은 〔추정〕 표시 · <b>실제 면접 대체가 아니라 리허설용</b></div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "300px 1fr", gap: 14, alignItems: "start" }}>
+        <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 14, maxHeight: isMobile ? 220 : "calc(100vh - 220px)", overflowY: "auto" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, marginBottom: 8 }}>📋 킷 질문 — 클릭하면 바로 물어봅니다</div>
+          {kitQs.length ? kitQs.map((q, i) => (
+            <div key={i} onClick={() => ask(q)} style={{ fontSize: 11.5, color: C.text, lineHeight: 1.5, padding: "7px 9px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 5, cursor: busy ? "wait" : "pointer", opacity: busy ? .5 : 1 }}>{q}</div>
+          )) : <div style={{ fontSize: 11.5, color: C.muted }}>킷 질문 없음 — 오른쪽에 직접 입력</div>}
+        </div>
+        <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16, display: "flex", flexDirection: "column", minHeight: 420 }}>
+          <div ref={logRef} style={{ flex: 1, overflowY: "auto", maxHeight: "calc(100vh - 320px)", minHeight: 300, paddingRight: 4 }}>
+            {msgs.length === 0 && (
+              <div style={{ textAlign: "center", color: C.muted, padding: "60px 0" }}>
+                <div style={{ fontSize: 34, marginBottom: 10 }}>🎭</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>왼쪽 킷 질문을 클릭하거나 아래에 질문을 입력하세요</div>
+                <div style={{ fontSize: 11.5, marginTop: 5 }}>예: 조건 선고지 반응, 공백기 사유, 연봉 갭 수용 여부를 미리 시험해보세요</div>
+              </div>
+            )}
+            {msgs.map((m, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: m.role === "q" ? "flex-end" : "flex-start", marginBottom: 8 }}>
+                <div style={{ maxWidth: "85%", padding: "9px 13px", borderRadius: m.role === "q" ? "13px 13px 3px 13px" : "13px 13px 13px 3px", background: m.role === "q" ? C.glow : C.surface, border: `1px solid ${m.role === "q" ? `${C.accent}35` : C.border}`, fontSize: 12.5, color: C.text, lineHeight: 1.65, whiteSpace: "pre-wrap" }}>
+                  {m.role === "a" && <span style={{ fontWeight: 700, color: C.purple }}>🎭 {candidate.name} · </span>}{m.text}
+                </div>
+              </div>
+            ))}
+            {busy && <div style={{ fontSize: 12, color: C.muted, padding: "6px 2px" }}>🎭 {candidate.name} 답변 작성 중...</div>}
+          </div>
+          <div style={{ display: "flex", gap: 7, marginTop: 10 }}>
+            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && ask(input)} placeholder="질문 입력 후 Enter (예: 왜 6개월째 쉬고 계신가요?)"
+              style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 9, color: C.text, padding: "10px 13px", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+            <button onClick={() => ask(input)} disabled={busy || !input.trim()} style={{ background: `linear-gradient(135deg,${C.purple},${C.pink})`, border: "none", borderRadius: 9, color: "#fff", padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", opacity: (busy || !input.trim()) ? .45 : 1 }}>질문</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Interview Room ───────────────────────────────────────────────────────────
 // ─── 면접 조건 기록 (입사 가능 시기·희망 연봉) ─────────────────────────────
 const START_PRESETS = ["즉시", "2주 이내", "1개월 이내", "협의 필요"];
@@ -3124,6 +3208,11 @@ export default function HireL() {
         {view === "onboarding" && (
           <OnboardingView candidates={candidates} positions={positions} onUpdate={updateCandidate} showToast={showToast} />
         )}
+        {view === "sim" && (() => {
+          const c = candidates.find(x => x.id === selectedCandidateId);
+          if (!c) return <div style={{ color: C.muted, padding: "40px 0", textAlign: "center" }}>후보를 먼저 선택하세요</div>;
+          return <SimRoom candidate={c} position={positions.find(p => p.id === c.positionId)} onBack={() => setView("detail")} />;
+        })()}
         {view === "library" && (
           <LibraryView candidates={filteredCandidates} positions={positions} onSelect={(id) => { setSelectedCandidateId(id); setActiveTab("overview"); setView("detail"); }} onToggleStar={toggleStar} />
         )}
@@ -3291,6 +3380,7 @@ export default function HireL() {
                         <div style={{ padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 700, background: vStyle(a.verdict).bg, border: `1px solid ${vStyle(a.verdict).border}`, color: vStyle(a.verdict).color, whiteSpace: "nowrap" }}>{a.verdict}</div>
                         <button onClick={() => exportCandidatePDF(c, pos)} style={{ ...BP(`linear-gradient(135deg,#64748B,#475569)`), padding: "8px 14px", fontSize: 13 }}>📄 PDF 저장</button>
                         <button onClick={() => { setInterviewCandidateId(c.id); setView("interview"); }} style={{ ...BP(`linear-gradient(135deg,${C.purple},${C.pink})`), padding: "8px 14px", fontSize: 13 }}>🎤 면접 시작</button>
+                        <button onClick={() => setView("sim")} title="AI가 이 후보를 연기 — 예상 답변 리허설" style={{ ...BP("transparent"), border: `1px solid ${C.purple}45`, color: C.purple, boxShadow: "none", padding: "8px 14px", fontSize: 13 }}>🎭 시뮬레이션</button>
                         <button onClick={() => doAnalyze(c)} style={{ ...BP(), padding: "8px 14px", fontSize: 13 }}>재분석</button>
                       </div>
                     )}
