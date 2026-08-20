@@ -35,6 +35,18 @@ function ChannelBadge({ channel, small }) {
   return <span style={{ display: "inline-block", fontSize: small ? 9 : 10, fontWeight: 700, color: col, background: `${col}18`, border: `1px solid ${col}40`, padding: small ? "1px 6px" : "2px 8px", borderRadius: 10, whiteSpace: "nowrap" }}>{ch}</span>;
 }
 
+// ─── 모바일 감지 (768px 미만 → 2단 그리드를 1단으로) ──────────────────────────
+function useIsMobile() {
+  const [m, setM] = useState(false);
+  useEffect(() => {
+    const check = () => setM(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return m;
+}
+
 // ─── 파이프라인 단계 (순서 고정, "탈락"은 맨 끝 별도 컬럼) ─────────────────────
 const STAGES = ["서류검토", "포트폴리오확인", "면접제의", "면접", "과제", "처우협의", "합격", "탈락"];
 const STAGE_COLORS = { 서류검토: "#6B7280", 포트폴리오확인: "#7C3AED", 면접제의: "#0284C7", 면접: "#2563EB", 과제: "#D97706", 처우협의: "#DB2777", 합격: "#059669", 탈락: "#64748B" };
@@ -1019,6 +1031,7 @@ function obDays(startDate) {
   return d < 0 ? null : d;
 }
 function OnboardingView({ candidates, positions, onUpdate, showToast }) {
+  const isMobile = useIsMobile();
   const list = candidates.filter(c => c.onboarding || ["합격", "처우협의"].includes(c.stage));
   const [selId, setSelId] = useState(null);
   const [obTab, setObTab] = useState("ms");
@@ -1122,7 +1135,7 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
       </div>
       <div key={c.id}>
         {obTab === "ms" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, alignItems: "start" }}>
           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 10 }}>📍 3개월 마일스톤 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· 지연(빨강)은 그 주에 반드시 해소</span></div>
             {OB_MILESTONES.map(m => {
@@ -1226,7 +1239,7 @@ function OnboardingView({ candidates, positions, onUpdate, showToast }) {
         </div>
         )}
         {obTab === "retro" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {OB_RETROS.map(([rk, label]) => {
             const r = ob.retros?.[rk] || {};
@@ -1499,6 +1512,7 @@ function InterviewResumeCard({ candidate }) {
 }
 
 function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
+  const isMobile = useIsMobile();
   const rc = ROLE_COLORS[position?.colorIdx || 0];
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -1630,7 +1644,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 14, rowGap: 10, marginBottom: 22 }}>
         <button onClick={onBack} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 13px", color: C.sub, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>← 나가기</button>
         <div style={{ width: 42, height: 42, borderRadius: 11, background: `${rc.accent}25`, border: `1px solid ${rc.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: rc.accent }}>{candidate.name[0]}</div>
         <div>
@@ -1659,7 +1673,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 370px", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 370px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <EvpScriptCard />
           <GrayAreaBanner candidate={candidate} />
@@ -1831,6 +1845,7 @@ function PositionModal({ onClose, onSave, existing }) {
 
 // ─── Decision / 합의 Room ──────────────────────────────────────────────────────
 function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoading, onSaveFinal, onBack, showToast }) {
+  const dcMobile = useIsMobile();
   const fb = candidate.interviewFeedback;
   const a = candidate.analysis;
   const rc = ROLE_COLORS[position?.colorIdx || 0];
@@ -1905,7 +1920,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 14, rowGap: 10, marginBottom: 22 }}>
         <button onClick={onBack} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 13px", color: C.sub, cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>← 나가기</button>
         <div style={{ width: 42, height: 42, borderRadius: 11, background: `${rc.accent}25`, border: `1px solid ${rc.accent}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: rc.accent }}>{candidate.name[0]}</div>
         <div>
@@ -1915,7 +1930,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
         {fd && <div style={{ marginLeft: "auto", padding: "6px 14px", borderRadius: 16, fontSize: 13, fontWeight: 700, background: (DEC_STYLE[fd.result] || rs).bg, border: `1px solid ${(DEC_STYLE[fd.result] || rs).b}`, color: (DEC_STYLE[fd.result] || rs).c }}>확정: {fd.result}</div>}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: dcMobile ? "1fr" : "1fr 380px", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={Card}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 14 }}>🤖 AI 종합 피드백</div>
@@ -1996,6 +2011,7 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
 
 // ─── 채용 종합 리포트 화면 ──────────────────────────────────────────────────────
 function ReportView({ candidates, positions, onExport }) {
+  const rvMobile = useIsMobile();
   const posName = (id) => positions.find(p => p.id === id)?.name || "미지정";
   const passed = candidates.filter(c => c.finalDecision?.result === "합격");
   const hold = candidates.filter(c => c.finalDecision?.result === "보류");
@@ -2014,7 +2030,7 @@ function ReportView({ candidates, positions, onExport }) {
         <button onClick={onExport} style={{ marginLeft: "auto", background: `linear-gradient(135deg,${C.accent},${C.teal})`, border: "none", borderRadius: 8, color: "#fff", padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>📄 PDF / 인쇄</button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10, marginBottom: 22 }}>
+      <div style={{ display: "grid", gridTemplateColumns: rvMobile ? "repeat(2,1fr)" : "repeat(5,1fr)", gap: 10, marginBottom: 22 }}>
         {kpi.map(([l, n, col]) => <div key={l} style={{ ...Card, textAlign: "center", padding: 16 }}>
           <div style={{ fontSize: 26, fontWeight: 800, color: col }}>{n}</div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{l}</div>
@@ -2454,6 +2470,7 @@ const SAMPLE_CANDIDATES = [
 export default function HireL() {
   const [view, setView] = useState("dashboard");
   const [dataMenu, setDataMenu] = useState(false);
+  const isMobile = useIsMobile();
   const [positions, setPositions] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [selectedPositionId, setSelectedPositionId] = useState("all");
@@ -2842,7 +2859,7 @@ export default function HireL() {
             <span style={{ width: 1, height: 16, background: C.border, margin: "0 4px" }} />
             <span style={{ fontSize: 12, color: C.muted }}>면접 진행 중 · {interviewPosition?.name}</span>
           </div>
-          <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 28px" }}>
+          <div style={{ maxWidth: 1160, margin: "0 auto", padding: isMobile ? "16px 12px" : "24px 28px" }}>
             <InterviewRoom candidate={interviewCandidate} position={interviewPosition} onBack={() => { setView("detail"); setSelectedCandidateId(interviewCandidateId); }} onFinish={(t) => finishInterview(interviewCandidate, interviewPosition, t)} onUpdate={(patch) => updateCandidate(interviewCandidate.id, patch)} />
           </div>
         </div>
@@ -2861,7 +2878,7 @@ export default function HireL() {
             <span style={{ width: 1, height: 16, background: C.border, margin: "0 4px" }} />
             <span style={{ fontSize: 12, color: C.muted }}>면접 결과 · 합의 · {decisionPosition?.name}</span>
           </div>
-          <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 28px" }}>
+          <div style={{ maxWidth: 1160, margin: "0 auto", padding: isMobile ? "16px 12px" : "24px 28px" }}>
             <DecisionRoom candidate={decisionCandidate} position={decisionPosition} isHost={isRoomHost || !syncEnabled} roomId={roomId} syncEnabled={syncEnabled} genLoading={genFeedbackFor === decisionCandidate.id} onSaveFinal={saveFinalDecision} onBack={() => { setView("detail"); setSelectedCandidateId(decisionCandidateId); }} showToast={showToast} />
           </div>
         </div>
@@ -2886,8 +2903,8 @@ export default function HireL() {
 
       <input ref={importRef} type="file" accept=".json" hidden onChange={importJSON} />
 
-      <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: "0 28px", position: "sticky", top: 0, zIndex: 100 }}>
-        <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", alignItems: "center", height: 56, gap: 20 }}>
+      <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: isMobile ? "0 12px" : "0 28px", position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", alignItems: "center", flexWrap: "wrap", minHeight: 56, padding: "8px 0", gap: isMobile ? 10 : 20, rowGap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
             <div style={{ width: 28, height: 28, borderRadius: 7, background: `linear-gradient(135deg,${C.accent},${C.teal})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: "#fff" }}>H</div>
             <span style={{ fontSize: 15, fontWeight: 700 }}>HireL</span>
@@ -2991,7 +3008,7 @@ export default function HireL() {
         )}
       </div>
 
-      <div style={{ maxWidth: 1160, margin: "0 auto", padding: "24px 28px" }}>
+      <div style={{ maxWidth: 1160, margin: "0 auto", padding: isMobile ? "16px 12px" : "24px 28px" }}>
         {view === "report" && (
           <ReportView candidates={candidates} positions={positions} onExport={() => exportRecruitmentReport(candidates, positions)} />
         )}
@@ -3206,7 +3223,7 @@ export default function HireL() {
                     </div>
                   ) : (<>
                     {activeTab === "overview" && (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
                         <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 22 }}>
                           <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 16, color: C.sub }}>SCORE BREAKDOWN</h3>
                           <div style={{ display: "flex", justifyContent: "space-around", marginBottom: 20 }}>
