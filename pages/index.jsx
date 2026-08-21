@@ -1615,13 +1615,19 @@ function InterviewResumeCard({ candidate }) {
         const bi = CAREER_BUILTIN[(candidate.name || "").trim()];
         const birth = bi?.birth;
         const edu = bi?.edu;
-        if (!birth && !edu && !candidate.age) return null;
+        const c9 = candidate;
+        if (!birth && !edu && !c9.age && !c9.grade && !c9.salaryText) return null;
         const chip = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: C.text, background: C.surface, border: `1px solid ${C.border}`, padding: "3px 9px", borderRadius: 9 };
         return (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 7 }}>
             {birth ? <span style={chip}>🎂 {birth}년생 · 만 {new Date().getFullYear() - birth}세</span>
-              : candidate.age ? <span style={chip}>🎂 {candidate.age}세</span> : null}
+              : c9.age ? <span style={chip}>🎂 {c9.age}세</span> : null}
             {edu && <span style={{ ...chip, maxWidth: "100%" }}>🎓 {edu}</span>}
+            {c9.grade && <span style={{ ...chip, color: C.accent, borderColor: `${C.accent}45` }}>등급 {c9.grade}{c9.ledgerScore ? ` · ${c9.ledgerScore}점` : ""}</span>}
+            {c9.track && <span style={chip}>{c9.track}</span>}
+            {c9.salaryText && <span style={{ ...chip, color: (c9.salaryMax || 0) > 5500 ? C.red : C.green, borderColor: `${(c9.salaryMax || 0) > 5500 ? C.red : C.green}40` }}>💰 {c9.salaryText}{(c9.salaryMax || 0) > 5500 ? " ⚠상한 초과" : ""}</span>}
+            {c9.wantsLead && <span style={{ ...chip, color: C.red, borderColor: `${C.red}40` }}>⚠ 팀장급 성향</span>}
+            {c9.hrDecision && c9.hrDecision !== "-" && <span style={{ ...chip, color: C.purple, borderColor: `${C.purple}40` }}>인사 {c9.hrDecision}</span>}
           </div>
         );
       })()}
@@ -2819,7 +2825,16 @@ export default function HireL() {
           questionScores: c.questionScores || null,
           customQuestions: c.customQuestions || null,
           onboarding: c.onboarding || null,
-          resume: (c.resume||"").slice(0, 300),
+          // 전용 필드 (2026-08-21 피드백: 텍스트에 묻히지 않게 분리 — 정렬·필터용)
+          grade: c.grade || null,
+          track: c.track || null,
+          ledgerScore: c.ledgerScore ?? null,
+          salaryText: c.salaryText || null,
+          salaryMax: c.salaryMax ?? null,
+          wantsLead: c.wantsLead ?? null,
+          hrDecision: c.hrDecision || null,
+          conditions: c.conditions || null,
+          resume: (c.resume||"").slice(0, 1000),
           files: [],
           analysis: c.analysis ? {
             totalScore: c.analysis.totalScore,
@@ -3080,6 +3095,13 @@ export default function HireL() {
           manualScoredBy: c.manualScoredBy || null,
           questionScores: c.questionScores || null,
           onboarding: c.onboarding || null,
+          grade: c.grade || null,
+          track: c.track || null,
+          salaryText: c.salaryText || null,
+          salaryMax: c.salaryMax ?? null,
+          wantsLead: c.wantsLead ?? null,
+          hrDecision: c.hrDecision || null,
+          conditions: c.conditions || null,
           analysisScore: v2 ? v2WeightedTotal(v2) : (c.analysis?.totalScore ?? null),
           aiVerdict: fb?.aiVerdict || c.analysis?.verdict || null,
           finalDecision: c.finalDecision?.result || null,
