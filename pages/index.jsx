@@ -2437,6 +2437,34 @@ function StarButton({ on, onToggle, size = 16 }) {
 }
 
 // ─── 수동 채점 (v2 축 6개) — AI vs 수동 나란히 비교 ─────────────────────────────
+// AI 채점만 읽기 전용으로 보여주는 v2 축 카드 (상세 분석 기본 표시 — 수동 채점은 접이식으로 분리)
+function AiV2Summary({ candidate }) {
+  const ai = candidate.analysis?.v2Scores;
+  if (!ai) return null;
+  const total = v2WeightedTotal(ai);
+  return (
+    <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>🎯 큐라엘 v2 축 — AI 채점</span>
+        <span style={{ marginLeft: "auto", fontSize: 15, fontWeight: 800, color: C.accent, fontFamily: "'DM Mono',monospace" }}>{total}점</span>
+      </div>
+      {V2_AXES.map(([k, label, w]) => {
+        const v = Number(ai[k] ?? 0);
+        return (
+          <div key={k} style={{ marginBottom: 7 }}>
+            <div style={{ display: "flex", fontSize: 11.5, color: C.sub, marginBottom: 3 }}>
+              <span>{label} <span style={{ color: C.muted }}>x{w}</span></span>
+              <span style={{ marginLeft: "auto", fontWeight: 700, color: C.text, fontFamily: "'DM Mono',monospace" }}>{v}</span>
+            </div>
+            <div style={{ height: 6, background: C.surface, borderRadius: 4, overflow: "hidden" }}>
+              <div style={{ width: `${Math.min(100, v / 5 * 100)}%`, height: "100%", background: `linear-gradient(90deg,${C.accent},${C.teal})` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 function ManualV2Card({ candidate, onSave, showToast }) {
   const ai = candidate.analysis?.v2Scores || null;
   const [draft, setDraft] = useState(() => V2_AXES.reduce((o, [k]) => ({ ...o, [k]: 0 }), {}));
@@ -3489,9 +3517,6 @@ export default function HireL() {
                   <div style={{ marginBottom: 18 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>📎 첨부 자료 <span style={{ fontWeight: 400, color: C.muted }}>· 원본은 사내 폴더 보관, 여기엔 경로만</span></div>
                     <FileRefsSection candidate={c} onUpdate={fr => updateCandidate(c.id, { fileRefs: fr })} showToast={showToast} />
-                    <div style={{ marginTop: 12 }}>
-                      <ConditionsCard candidate={c} onUpdate={patch => updateCandidate(c.id, patch)} />
-                    </div>
                   </div>
                   {a && !busy && (
                     <div style={{ marginBottom: 18 }}>
@@ -3513,9 +3538,12 @@ export default function HireL() {
                   {busy ? <Spin label="AI가 분석하고 있습니다..." /> : !a ? (
                     <div>
                       <div style={{ textAlign: "center", padding: "26px 0" }}><button onClick={() => doAnalyze(c)} style={BP()}>AI 분석 시작</button></div>
-                      <div style={{ maxWidth: 560 }}>
-                        <ManualV2Card candidate={c} onSave={patch => updateCandidate(c.id, patch)} showToast={showToast} />
-                      </div>
+                      <details style={{ maxWidth: 560, background: C.card, borderRadius: 13, border: `1px dashed ${C.borderL}`, padding: "12px 16px" }}>
+                        <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: C.sub }}>✍️ 수동 채점 열기 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· AI 분석 없이 직접 채점할 때만</span></summary>
+                        <div style={{ marginTop: 12 }}>
+                          <ManualV2Card candidate={c} onSave={patch => updateCandidate(c.id, patch)} showToast={showToast} />
+                        </div>
+                      </details>
                     </div>
                   ) : (<>
                     {activeTab === "overview" && (
@@ -3543,7 +3571,13 @@ export default function HireL() {
                             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 9 }}>✦ AI 요약</h3>
                             <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.7, margin: 0 }}>{a.summary}</p>
                           </div>
-                          <ManualV2Card candidate={c} onSave={patch => updateCandidate(c.id, patch)} showToast={showToast} />
+                          <AiV2Summary candidate={c} />
+                          <details style={{ background: C.card, borderRadius: 13, border: `1px dashed ${C.borderL}`, padding: "12px 16px" }}>
+                            <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: C.sub }}>✍️ 수동 채점 열기 <span style={{ fontWeight: 400, fontSize: 11, color: C.muted }}>· 기본은 AI 채점만 표시 — 직접 채점할 때만 펼치세요</span></summary>
+                            <div style={{ marginTop: 12 }}>
+                              <ManualV2Card candidate={c} onSave={patch => updateCandidate(c.id, patch)} showToast={showToast} />
+                            </div>
+                          </details>
                           <div style={{ background: C.card, borderRadius: 13, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,.06)", padding: 16 }}>
                             <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 9 }}>강점</h3>
                             {a.strengths?.map((s, i) => <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}><span style={{ color: C.green }}>✓</span><span style={{ fontSize: 13, color: C.sub }}>{s}</span></div>)}
