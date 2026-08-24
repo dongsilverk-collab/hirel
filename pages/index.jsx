@@ -1037,6 +1037,67 @@ function obDays(startDate) {
   const d = Math.floor((Date.now() - new Date(startDate + "T00:00:00").getTime()) / 86400000);
   return d < 0 ? null : d;
 }
+// ─── 지원 접수함: /careers 공개 페이지에서 들어온 지원서 (applications/ 경로 — 룸 push에 안 덮임) ───
+function InboxView({ onRegister, showToast }) {
+  const [apps, setApps] = useState({});
+  const [loading, setLoading] = useState(true);
+  const load = async () => {
+    setLoading(true);
+    try { const r = await fetch("/api/apply"); const d = await r.json(); setApps(d && typeof d === "object" ? d : {}); }
+    catch (e) { showToast("접수함 불러오기 실패 — 네트워크 확인"); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+  const setState = async (id, state) => {
+    setApps(p => ({ ...p, [id]: { ...p[id], state } }));
+    try { await fetch("/api/apply", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, state }) }); } catch (e) {}
+  };
+  const list = Object.values(apps).filter(a => a && a.id).sort((a, b) => String(b.ts || "").localeCompare(String(a.ts || "")));
+  const newCnt = list.filter(a => a.state === "new").length;
+  const stBadge = (s) => s === "new" ? ["신규", C.green] : s === "registered" ? ["후보 등록됨", C.accent] : ["보류", C.muted];
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>📥 지원 접수함</h2>
+        <span style={{ fontSize: 12, color: C.sub }}>커리어 페이지(/careers)로 들어온 지원서 {list.length}건 · 신규 {newCnt}건</span>
+        <button onClick={load} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "5px 12px", fontSize: 12, marginLeft: "auto" }}>새로고침</button>
+      </div>
+      {loading ? <Spin label="접수함 불러오는 중..." /> : !list.length ? (
+        <div style={{ background: C.card, border: `1px dashed ${C.border}`, borderRadius: 12, padding: "40px 20px", textAlign: "center", color: C.muted, fontSize: 13.5 }}>
+          아직 접수된 지원서가 없습니다.<br />커리어 페이지 주소를 공고·프로필·명함에 공유하세요: <b style={{ color: C.accent }}>{typeof window !== "undefined" ? `${window.location.origin}/careers` : "/careers"}</b>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {list.map(a => {
+            const [sl, sc] = stBadge(a.state);
+            return (
+              <div key={a.id} style={{ background: C.card, border: `1px solid ${a.state === "new" ? C.green + "55" : C.border}`, borderRadius: 12, padding: "14px 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <b style={{ fontSize: 15 }}>{a.name}</b>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: sc, border: `1px solid ${sc}55`, borderRadius: 12, padding: "1px 9px" }}>{sl}</span>
+                  <span style={{ fontSize: 12, color: C.muted }}>{String(a.ts || "").slice(0, 16).replace("T", " ")}</span>
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                    {a.state === "new" && <>
+                      <button onClick={() => { if (onRegister(a)) setState(a.id, "registered"); }} style={{ ...BP(), padding: "6px 13px", fontSize: 12.5 }}>후보로 등록</button>
+                      <button onClick={() => setState(a.id, "hold")} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "6px 13px", fontSize: 12.5 }}>보류</button>
+                    </>}
+                    {a.state === "hold" && <button onClick={() => setState(a.id, "new")} style={{ ...BP("transparent"), border: `1px solid ${C.borderL}`, color: C.sub, boxShadow: "none", padding: "6px 13px", fontSize: 12.5 }}>신규로 되돌리기</button>}
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, color: C.sub, marginTop: 8, display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <span>📞 {a.phone || "—"}</span><span>✉ {a.email || "—"}</span><span>경력 {a.career || "—"}</span><span>{a.workStatus || ""}</span><span>희망 {a.salary || "—"}</span>
+                  {a.portfolio && <a href={a.portfolio} target="_blank" rel="noreferrer" style={{ color: C.accent }}>포트폴리오 ↗</a>}
+                </div>
+                {a.intro && <div style={{ fontSize: 13, color: C.text, marginTop: 8, background: C.surface, borderRadius: 8, padding: "9px 12px", whiteSpace: "pre-wrap" }}>{a.intro}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OnboardingView({ candidates, positions, onUpdate, showToast }) {
   const isMobile = useIsMobile();
   const list = candidates.filter(c => c.onboarding || ["합격", "처우협의"].includes(c.stage));
@@ -3067,6 +3128,24 @@ export default function HireL() {
     doAnalyzeAndSync(c);
   };
 
+  // 커리어 페이지 지원서 → 후보 등록 (접수함에서 호출)
+  const registerFromApplication = (app) => {
+    const pid = selectedPositionId !== "all" ? selectedPositionId : positions[0]?.id;
+    if (!pid) { showToast("먼저 포지션을 만들어 주세요"); return false; }
+    const resume = [
+      `[커리어 페이지 지원서 — ${String(app.ts || "").slice(0, 10)}]`,
+      `연락처: ${app.phone || "-"} / 이메일: ${app.email || "-"}`,
+      `총 경력: ${app.career || "-"} / 현재 상태: ${app.workStatus || "-"} / 희망연봉: ${app.salary || "-"}`,
+      app.portfolio ? `포트폴리오: ${app.portfolio}` : "",
+      app.intro ? `\n[하고 싶은 말]\n${app.intro}` : "",
+    ].filter(Boolean).join("\n");
+    const c = { id: `c${Date.now()}`, positionId: pid, name: app.name, age: null, channel: "커리어페이지", stage: "서류검토", resume, files: [], fileNames: [] };
+    setCandidates(p => [...p, c]);
+    showToast(`${app.name} 후보 등록 완료 — AI 분석 시작`);
+    doAnalyzeAndSync(c);
+    return true;
+  };
+
   const addPosition = (data) => {
     if (editingPosition) { setPositions(p => p.map(x => x.id === editingPosition.id ? { ...x, ...data } : x)); }
     else { const np = { id: `p${Date.now()}`, ...data }; setPositions(p => [...p, np]); setSelectedPositionId(np.id); }
@@ -3234,7 +3313,7 @@ export default function HireL() {
             <span style={{ fontSize: 10, color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: "2px 7px", borderRadius: 18 }}>BETA</span>
           </div>
           <div style={{ display: "flex", gap: 2, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 3, flexShrink: 0 }}>
-            {[["dashboard", "대시보드"], ["board", "보드"], ["library", "자료실"], ["detail", "상세 분석"], ["report", "리포트"], ["onboarding", "온보딩"]].map(([v, l]) => (
+            {[["dashboard", "대시보드"], ["board", "보드"], ["library", "자료실"], ["detail", "상세 분석"], ["report", "리포트"], ["onboarding", "온보딩"], ["inbox", "접수함"]].map(([v, l]) => (
               <button key={v} onClick={() => setView(v)} style={{ padding: "6px 13px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: view === v ? 700 : 500, whiteSpace: "nowrap", background: view === v ? C.glow : "transparent", color: view === v ? C.accent : C.sub, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{l}</button>
             ))}
           </div>
@@ -3334,6 +3413,9 @@ export default function HireL() {
       <div style={{ maxWidth: 1160, margin: "0 auto", padding: isMobile ? "16px 12px" : "24px 28px" }}>
         {view === "report" && (
           <ReportView candidates={candidates} positions={positions} onExport={() => exportRecruitmentReport(candidates, positions)} />
+        )}
+        {view === "inbox" && (
+          <InboxView onRegister={registerFromApplication} showToast={showToast} />
         )}
         {view === "onboarding" && (
           <OnboardingView candidates={candidates} positions={positions} onUpdate={updateCandidate} showToast={showToast} />
