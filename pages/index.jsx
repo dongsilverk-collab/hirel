@@ -1714,7 +1714,7 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate, onSim 
   const [lastScoredLen, setLastScoredLen] = useState(0);
   const [silenceTimer, setSilenceTimer] = useState(null);
   const recogRef = useRef(null);
-  // ─── 음성 파일 녹음 (STT와 병행, 중지 시 .webm 자동 다운로드) ────────────────
+  // ─── 음성 파일 녹음 (STT와 병행, 중지 시 .m4a로 폴더/다운로드 저장) ────────────────
   const mediaRecRef = useRef(null);
   const recChunksRef = useRef([]);
   const audioStreamRef = useRef(null);
@@ -1739,17 +1739,22 @@ function InterviewRoom({ candidate, position, onBack, onFinish, onUpdate, onSim 
       if (recDirRef.current) await ensureRecDirPermission(recDirRef.current);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-      const mr = new MediaRecorder(stream);
+      // m4a(audio/mp4)로 바로 저장 — 클로바노트가 webm을 안 받아 변환 작업이 하나 늘었던 문제 해결.
+      // 미지원 브라우저(구형 크롬 등)만 webm 폴백
+      const m4aOk = window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported("audio/mp4");
+      const recMime = m4aOk ? "audio/mp4" : "audio/webm";
+      const recExt = m4aOk ? "m4a" : "webm";
+      const mr = new MediaRecorder(stream, m4aOk ? { mimeType: "audio/mp4", audioBitsPerSecond: 96000 } : undefined);
       recChunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) recChunksRef.current.push(e.data); };
       mr.onstop = async () => {
         try {
-          const blob = new Blob(recChunksRef.current, { type: "audio/webm" });
+          const blob = new Blob(recChunksRef.current, { type: recMime });
           if (blob.size > 2000) {
             const url = URL.createObjectURL(blob);
             const now = new Date();
             const pad = (n) => String(n).padStart(2, "0");
-            const fname = `면접녹음_${candidate.name}_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.webm`;
+            const fname = `면접녹음_${candidate.name}_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.${recExt}`;
             setAudioUrl(p => { if (p) URL.revokeObjectURL(p); return url; });
             setAudioName(fname);
             // 1순위: 지정 폴더(Y:\...\03_면접녹음)에 직접 저장 / 실패 시 다운로드 폴백
