@@ -3155,9 +3155,9 @@ export default function HireL() {
   // 08.31 보드 정리(대표 지시): 마스킹 이름(김*은 등 대장 잔여분)은 누군지 확인이 안 돼 제거 — 면접 확정·예정분 중심 보드로. 1회만
   useEffect(() => {
     try {
-      if (localStorage.getItem("purge_masked_0901") === "1") return;
-      setCandidates(p => p.filter(c => !(c && typeof c.name === "string" && c.name.includes("*"))));
-      localStorage.setItem("purge_masked_0901", "1");
+      if (localStorage.getItem("purge_masked_0901b") === "1") return;
+      setCandidates(p => p.filter(c => !(c && typeof c.name === "string" && (c.name.includes("*") || c.name.includes("○")))));
+      localStorage.setItem("purge_masked_0901b", "1");
     } catch (e) {}
   }, []);
 
