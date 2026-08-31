@@ -3519,7 +3519,8 @@ export default function HireL() {
   const starFiltered = starredOnly ? candidates.filter(c => c.starred) : candidates;
   const channelFiltered = selectedChannel === "all" ? starFiltered : starFiltered.filter(c => (c.channel || "기타") === selectedChannel);
   const filteredCandidates = selectedPositionId === "all" ? channelFiltered : channelFiltered.filter(c => c.positionId === selectedPositionId);
-  const grouped = positions.map(pos => ({ pos, cands: [...channelFiltered.filter(c => c.positionId === pos.id)].sort((a, b) => (b.analysis?.totalScore || 0) - (a.analysis?.totalScore || 0)) })).filter(g => g.cands.length > 0);
+  // 대시보드는 탈락 후보를 숨긴다(08.31 대표 지시) — 기록은 유지, 보드 탭의 탈락 칸에서만 보임
+  const grouped = positions.map(pos => ({ pos, cands: [...channelFiltered.filter(c => c.positionId === pos.id && (c.stage || "서류검토") !== "탈락")].sort((a, b) => (b.analysis?.totalScore || 0) - (a.analysis?.totalScore || 0)) })).filter(g => g.cands.length > 0);
 
   const importRef = useRef();
 
@@ -3820,7 +3821,7 @@ export default function HireL() {
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 14 }}>
-                {[...filteredCandidates].sort((a, b) => (b.analysis?.totalScore || 0) - (a.analysis?.totalScore || 0)).map(c => {
+                {[...filteredCandidates].filter(c => (c.stage || "서류검토") !== "탈락").sort((a, b) => (b.analysis?.totalScore || 0) - (a.analysis?.totalScore || 0)).map(c => {
                   const pos = positions.find(p => p.id === c.positionId);
                   const rc = ROLE_COLORS[pos?.colorIdx || 0];
                   return (<CandidateCard key={c.id} c={c} rc={rc} position={pos} analyzingIds={analyzingIds} vStyle={vStyle} onSelect={() => { setSelectedCandidateId(c.id); setActiveTab("overview"); setView("detail"); }} onInterview={() => { setInterviewCandidateId(c.id); setView("interview"); }} onReanalyze={() => doAnalyze(c)} onExportPDF={() => exportCandidatePDF(c, pos)} onDecision={() => { setDecisionCandidateId(c.id); setView("decision"); }} onToggleStar={() => toggleStar(c.id)} onStage={(st) => quickStage(c, st)} />);
