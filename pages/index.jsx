@@ -1871,7 +1871,7 @@ const CAREER_BUILTIN = {
       { company: "㈜코리아메디케어(코메디닷컴)", role: "콘텐츠팀", period: "2017.11~2019.02", dur: "1년 4개월", work: "**건강 전문 미디어** — 네이버 포스트 1.8만→4만, 13만 구독 건강 뉴스레터 주 4회, 올해의 건강 10대 포스트" },
       { company: "㈜시사통", role: "팟캐스트 PD", period: "2016.05~2017.01", dur: "9개월", work: "기획·섭외·녹음·편집, 일 다운로드 5만·차트 5위권" },
     ],
-    note: "🗓 면접 10/6(화) 15:00 · 열방약국으로 방문(그룹바이 스카우트→커피챗) · ✅ 건강 정보 번역력(코메디닷컴)+0→1 마케팅 세팅·자동화 · ⚠ 관문: 근속 패턴 + 카드뉴스·이미지 직접 제작 실물",
+    note: "🗓 1차 실무 면접 10/6(화) 15:00 · 열방약국으로 방문(그룹바이 스카우트→커피챗) · ✅ 건강 정보 번역력(코메디닷컴)+0→1 마케팅 세팅·자동화 · ⚠ 관문: 근속 패턴 + 카드뉴스·이미지 직접 제작 실물",
   },
   "안정은": {
     edu: "서경대 문화콘텐츠학과 졸업(2024.02, 학점 4.13)",
@@ -1882,7 +1882,7 @@ const CAREER_BUILTIN = {
       { company: "소마미술관", role: "인포메이션·전시운영(아르바이트)", period: "2024.09~2026.05", dur: "1년 9개월", work: "관람객 응대·안내·민원 — 고객 접점 현장" },
       { company: "㈜슈필렌", role: "행사기획 인턴", period: "2023.12~2024.02", dur: "3개월", work: "축제 프로그램 기획" },
     ],
-    note: "🗓 1차 실무 면접(일정 확인 필요) · ✅ 사전조사(상담 5,000명 언급)+VOC 인터뷰 기반 기획+릴스 포맷 분석 · ⚠ 관문: 팀 성과 중 본인 기여 분리, 제작 손 실물, 경력 요건 미충족 → 통과 시 대표가 신입 트랙 여부 결정",
+    note: "🗓 1차 실무 면접 10/1(목) · ✅ 사전조사(상담 5,000명 언급)+VOC 인터뷰 기반 기획+릴스 포맷 분석 · ⚠ 관문: 팀 성과 중 본인 기여 분리, 제작 손 실물, 경력 요건 미충족 → 통과 시 대표가 신입 트랙 여부 결정",
   },
   "강한별": {
     birth: 1997, edu: "건국대(서울) 산업융합학과 재학중(공급망관리·빅데이터) · 3톤 지게차 · OA 자격 5종 전부 A등급 · JLPT N5",
@@ -2187,6 +2187,17 @@ const CONTENT_JD = `직무명: SNS 콘텐츠 마케터 (큐라엘)
 
 전형: 1차 실무 면접(공통 평가 7항목) → 통과자만 2차 대표 면접`;
 const SEED_POSITION_CONTENT = { id: "p_content", name: "컨텐츠 마케터", colorIdx: 2, jd: CONTENT_JD };
+// 이름이 정확히 '컨텐츠/콘텐츠 마케터'인 포지션을 우선 — '① 콘텐츠 퍼포먼스 마케터(전환형)'(p_conv)는 제외
+function findContentPosition(positions) {
+  const list = (positions || []).filter(p => p && p.id !== "p_conv");
+  return list.find(p => /^(컨텐츠|콘텐츠)\s*마케터$/.test((p.name || "").trim()))
+    || list.find(p => /(컨텐츠|콘텐츠)\s*마케터/.test(p.name || ""))
+    || null;
+}
+const CONTENT_SEED_FIX = {
+  seed_bij_0929: { name: "백인준_이력서_그룹바이.pdf", path: "Y:\\본부\\인사\\마케터채용\\콘텐츠마케터_면접자\\백인준_이력서_그룹바이.pdf" },
+  seed_aje_0929: { name: "안정은_지원서.pdf", path: "Y:\\본부\\인사\\마케터채용\\콘텐츠마케터_면접자\\안정은_지원서.pdf" },
+};
 const SEED_CANDIDATES_6 = [
   {
     id: "seed_bij_0929", name: "백인준", channel: "그룹바이", stage: "면접",
@@ -2195,7 +2206,7 @@ const SEED_CANDIDATES_6 = [
   },
   {
     id: "seed_aje_0929", name: "안정은", channel: "기타", stage: "면접",
-    resume: "[1차 실무 면접 예정 — 일정 확인 필요]\n신입(정규 경력 없음) · 서경대 문화콘텐츠학과 졸업(2024.02)\n얼라이브커뮤니티 프로젝트(2026.06~07) — 2030 인터뷰 102건 → 유튜브+인스타 릴스 2채널 전략, 팀 콘텐츠 61건 누적 96만, 프로젝트 1위\n개인 인스타그램(2026.08~) — 개설 11일 팔로워 209, 최고 조회 8,043\n소마미술관 인포메이션·전시운영 1y9m(아르바이트) / 슈필렌 행사기획 인턴 3개월\n⚠ 공고 경력 요건(3~6년) 미충족 — 팀 성과 중 본인 기여 분리 필요\n상세는 앱 내장 경력카드·중점포인트 참조",
+    resume: "[1차 실무 면접 10/1(목)]\n신입(정규 경력 없음) · 서경대 문화콘텐츠학과 졸업(2024.02)\n얼라이브커뮤니티 프로젝트(2026.06~07) — 2030 인터뷰 102건 → 유튜브+인스타 릴스 2채널 전략, 팀 콘텐츠 61건 누적 96만, 프로젝트 1위\n개인 인스타그램(2026.08~) — 개설 11일 팔로워 209, 최고 조회 8,043\n소마미술관 인포메이션·전시운영 1y9m(아르바이트) / 슈필렌 행사기획 인턴 3개월\n⚠ 공고 경력 요건(3~6년) 미충족 — 팀 성과 중 본인 기여 분리 필요\n상세는 앱 내장 경력카드·중점포인트 참조",
     files: [], fileNames: ["안정은_마케팅_지원서.pdf"],
   },
 ];
@@ -3625,7 +3636,7 @@ export default function HireL() {
     try {
       if (localStorage.getItem("seed_content_0929_done") === "1") return;
       if (!Array.isArray(positions) || positions.length === 0) return;
-      const target = positions.find(p => p && /컨텐츠|콘텐츠/.test(p.name || ""));
+      const target = findContentPosition(positions);
       const pid = target ? target.id : SEED_POSITION_CONTENT.id;
       setPositions(p => {
         if (!p.some(x => x && x.id === pid)) return [...p, SEED_POSITION_CONTENT];
@@ -3636,6 +3647,29 @@ export default function HireL() {
         return missing.length ? [...p, ...missing] : p;
       });
       localStorage.setItem("seed_content_0929_done", "1");
+    } catch (e) {}
+  }, [positions]);
+
+  // 09.29 보정: 첫 시드가 '① 콘텐츠 퍼포먼스 마케터'에 잘못 붙었던 백인준·안정은을 '컨텐츠 마케터' 포지션으로 옮기고
+  // 일정(안정은 10/1 목)·첨부 경로를 반영 — 1회만
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("seed_content_move_0929") === "1") return;
+      if (!Array.isArray(positions) || positions.length === 0) return;
+      const target = findContentPosition(positions);
+      if (!target) return;
+      setCandidates(p => p.map(c => {
+        if (!c || !CONTENT_SEED_FIX[c.id]) return c;
+        const fix = CONTENT_SEED_FIX[c.id];
+        const refs = c.fileRefs || [];
+        return {
+          ...c,
+          positionId: target.id,
+          resume: (c.resume || "").replace("[1차 실무 면접 예정 — 일정 확인 필요]", "[1차 실무 면접 10/1(목)]"),
+          fileRefs: refs.some(r => r && r.path === fix.path) ? refs : [...refs, { name: fix.name, path: fix.path }],
+        };
+      }));
+      localStorage.setItem("seed_content_move_0929", "1");
     } catch (e) {}
   }, [positions]);
 
