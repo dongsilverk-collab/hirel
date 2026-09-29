@@ -3651,25 +3651,26 @@ export default function HireL() {
   }, [positions]);
 
   // 09.29 보정: 첫 시드가 '① 콘텐츠 퍼포먼스 마케터'에 잘못 붙었던 백인준·안정은을 '컨텐츠 마케터' 포지션으로 옮기고
-  // 일정(안정은 10/1 목)·첨부 경로를 반영 — 1회만
+  // 일정(안정은 10/1 목)·첨부 경로를 반영 — 예전 탭이 옛 데이터를 다시 저장해도 새로고침하면 다시 맞춰짐(바뀐 게 없으면 그대로)
   useEffect(() => {
     try {
-      if (localStorage.getItem("seed_content_move_0929") === "1") return;
       if (!Array.isArray(positions) || positions.length === 0) return;
       const target = findContentPosition(positions);
       if (!target) return;
-      setCandidates(p => p.map(c => {
-        if (!c || !CONTENT_SEED_FIX[c.id]) return c;
-        const fix = CONTENT_SEED_FIX[c.id];
-        const refs = c.fileRefs || [];
-        return {
-          ...c,
-          positionId: target.id,
-          resume: (c.resume || "").replace("[1차 실무 면접 예정 — 일정 확인 필요]", "[1차 실무 면접 10/1(목)]"),
-          fileRefs: refs.some(r => r && r.path === fix.path) ? refs : [...refs, { name: fix.name, path: fix.path }],
-        };
-      }));
-      localStorage.setItem("seed_content_move_0929", "1");
+      setCandidates(p => {
+        let changed = false;
+        const next = p.map(c => {
+          if (!c || !CONTENT_SEED_FIX[c.id] || c.positionId === "p_logi") return c;
+          const fix = CONTENT_SEED_FIX[c.id];
+          const refs = c.fileRefs || [];
+          const resume = (c.resume || "").replace("[1차 실무 면접 예정 — 일정 확인 필요]", "[1차 실무 면접 10/1(목)]");
+          const hasRef = refs.some(r => r && r.path === fix.path);
+          if (c.positionId === target.id && hasRef && resume === c.resume) return c;
+          changed = true;
+          return { ...c, positionId: target.id, resume, fileRefs: hasRef ? refs : [...refs, { name: fix.name, path: fix.path }] };
+        });
+        return changed ? next : p;
+      });
     } catch (e) {}
   }, [positions]);
 
