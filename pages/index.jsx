@@ -321,6 +321,63 @@ function decideResult(humanEvals, aiVote) {
   }
   return "보류";
 }
+// ─── 1차 실무 면접 공통 평가지 v1 (2026-09-29) — 7항목 1~5점, 가중합 11 → 환산 100점 ─────────
+// [키, 항목, 가중치, 치명 항목 여부, 무엇을 보나]
+const R1_AXES = [
+  ["r1", "직무 경험의 실체", 2, true, "본인이 직접 한 일과 팀·대행사가 한 일을 구분해 말하는가"],
+  ["r2", "결과물 품질", 2, false, "포트폴리오 완성도 — 카드뉴스 가독성, 릴스 첫 3초, 카피 정확성"],
+  ["r3", "숫자로 말하기", 1.5, false, "도달·저장·공유·유입으로 설명하고 왜 그 숫자가 나왔는지 아는가"],
+  ["r4", "건강 정보 번역력·표현 안전", 1.5, false, "전문 정보를 쉬운 말로, 질병 치료·예방 표현을 피할 줄 아는가"],
+  ["r5", "0→1 구축·체계화", 1, false, "채널을 처음 만든 경험, 콘텐츠 DB·제작 프로세스·지표 체계"],
+  ["r6", "근속·동기·조건 수용", 1, false, "이직 사유 일관성, 왜 큐라엘인가, 3개월 계약 후 전환·근무지 수용"],
+  ["r7", "제작 손", 2, true, "카드뉴스·이미지·블로그를 혼자 끝까지 만드는 속도와 수준"],
+];
+const R1_FLAGS = ["경력·성과 과장 의심", "연봉 기대 불일치", "근무 조건 수용 불가", "직무 범위 오해", "태도", "표시광고 감각 부재"];
+const R1_MAX = R1_AXES.reduce((s, a) => s + a[2] * 5, 0); // 55
+const r1Complete = (scores) => !!scores && R1_AXES.every(([k]) => Number(scores[k]) >= 1);
+function r1Total(scores) {
+  if (!r1Complete(scores)) return null;
+  return Math.round(R1_AXES.reduce((s, [k, , w]) => s + Number(scores[k]) * w, 0) / R1_MAX * 100);
+}
+// 판정 규칙: 2차 추천 = 평균 70↑ + 치명(①⑦) 평균 3.0↑ + 불합격 표 0 + 레드플래그 0
+//            탈락 = 평균 60 미만 또는 치명 평균 2.5 미만 또는 불합격 과반 / 나머지 = 보류(대표 판단)
+function r1Summary(humanEvals) {
+  const all = Object.values(humanEvals || {}).filter(v => v && typeof v === "object");
+  const scored = all.filter(v => v.rubric && r1Complete(v.rubric.scores));
+  if (scored.length === 0) return null;
+  const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+  const totals = scored.map(v => ({ name: v.name || "면접관", total: r1Total(v.rubric.scores), decision: v.decision }));
+  const avgTotal = Math.round(mean(totals.map(t => t.total)));
+  const perAxis = R1_AXES.map(([k, label, w, crit]) => ({ k, label, w, crit, avg: Math.round(mean(scored.map(v => Number(v.rubric.scores[k]))) * 10) / 10 }));
+  const critMin = Math.min(...perAxis.filter(a => a.crit).map(a => a.avg));
+  const rejects = all.filter(v => v.decision === "불합격").length;
+  const flagCount = {};
+  scored.forEach(v => (v.rubric.flags || []).forEach(f => { flagCount[f] = (flagCount[f] || 0) + 1; }));
+  const flags = Object.entries(flagCount).map(([f, n]) => `${f}${n > 1 ? ` ×${n}` : ""}`);
+  const spread = Math.max(...totals.map(t => t.total)) - Math.min(...totals.map(t => t.total));
+  let verdict = "보류";
+  if (avgTotal < 60 || critMin < 2.5 || rejects * 2 > all.length) verdict = "탈락";
+  else if (avgTotal >= 70 && critMin >= 3 && rejects === 0 && flags.length === 0) verdict = "2차 추천";
+  return { n: scored.length, totals, avgTotal, perAxis, critMin, rejects, flags, spread, verdict };
+}
+const R1_VERDICT_STYLE = { "2차 추천": DEC_STYLE.합격, 보류: DEC_STYLE.보류, 탈락: DEC_STYLE.불합격 };
+function r1ReportText(candidate, position, humanEvals) {
+  const s = r1Summary(humanEvals);
+  const lines = [`[1차 실무 면접 결과] ${candidate.name} · ${position?.name || ""}`];
+  if (!s) { lines.push("7항목 채점이 완료된 평가가 아직 없습니다."); return lines.join("\n"); }
+  lines.push(`면접관별 환산 점수: ${s.totals.map(t => `${t.name} ${t.total}`).join(" · ")} → 평균 ${s.avgTotal}점`);
+  lines.push(`항목별 평균: ${s.perAxis.map((a, i) => `${"①②③④⑤⑥⑦"[i]}${a.label} ${a.avg}${a.crit ? "★" : ""}`).join(" / ")}`);
+  if (s.spread >= 20) lines.push(`⚠ 면접관 간 점수 차 ${s.spread}점 — 합의 대화 결과를 함께 적어 주세요`);
+  lines.push(`레드플래그: ${s.flags.length ? s.flags.join(", ") : "없음"}`);
+  lines.push(`판정: ${s.verdict} (기준 — 평균 70↑ · 치명 항목 ①⑦ 평균 3.0↑ · 불합격 표 0 · 레드플래그 0)`);
+  const notes = Object.values(humanEvals || {}).filter(v => v && (v.comment || v.rubric?.memo));
+  if (notes.length) {
+    lines.push("면접관 메모:");
+    notes.forEach(v => lines.push(`- ${v.name || "면접관"} [${v.decision}] ${[v.comment, v.rubric?.memo].filter(Boolean).join(" / ")}`));
+  }
+  lines.push("2차 대표 면접에서 확인할 것: (면접관이 채워 주세요)");
+  return lines.join("\n");
+}
 function buildFinal(humanEvals, aiVote) {
   const boardEvals = aiVote ? { ...humanEvals, __ai__: aiVote } : { ...humanEvals };
   const { tally, total } = tallyDecisions(boardEvals);
@@ -852,6 +909,24 @@ const KIT_QUESTIONS = {
     { text: "리샘에서 쿠팡 밀크런 납품 세팅을 하셨다고요 — 그 세팅 과정을 처음부터요. 저희가 쿠팡을 키울 때 뭐부터 해야 합니까?", pass: "밀크런 프로세스 실물+우리 적용안", red: "용어만" },
     { text: "저희는 물류 1인 체제입니다 — 지게차도 타고 이카운트도 만져야 해요. 이카운트는 써보셨나요? 현장:사무 비중이 어땠으면 좋겠어요?", pass: "겸장 수용+이카운트 경험(없으면 학습 계획)", red: "한쪽만 기대" },
     { text: "건국대 산업융합학과 재학 중이신데 — 수업과 근무 병행은 어떻게 하실 계획인가요?", pass: "야간·주말 등 현실적 계획", red: "미정" },
+  ],
+  "백인준": [
+    { text: "(최초반) 최근 10년간 8곳, 그중 5곳이 9개월 이하입니다 — 회사별로 나온 이유를 짧게 듣고 싶습니다. 특히 뮤즈블라썸 3개월 계약 뒤 전환이 안 된 이유는요? 저희도 3개월 계약 후 전환 구조입니다.", pass: "사유가 회사별로 납득되고 패턴을 본인이 자각 + 3개월 계약 후 전환 구조 수용", red: "전부 회사 탓 / 자각 없음 / 전환 조건에 불편 신호" },
+    { text: "(제작 손) 포트폴리오에서 본인이 혼자 끝까지 만든 카드뉴스나 피드 이미지를 보여주세요. 툴은 무엇이고 1장 만드는 데 얼마나 걸리나요?", pass: "캔바·포토샵·피그마로 직접 제작, 1~2시간 안쪽 + 실물 제시", red: "디자이너에게 넘기고 기획만 / 실물 없음 (스킬 목록에 Figma만 있음)" },
+    { text: "(건강 정보 번역) 코메디닷컴 '영양 결핍 증상 4'가 올해의 건강 10대 포스트가 됐는데요 — 쉽게 풀면서 과장 표현은 어떻게 걸렀나요? 저희는 암 환우 대상 건강기능식품이라 '암 예방' 같은 표현을 쓸 수 없습니다.", pass: "근거 확인·표현 원칙이 구체적 + 표시광고 감각", red: "'임팩트를 위해 강하게 쓴다'" },
+    { text: "(본인 기여·숫자) 아이티데스크에서 CTR 0.23%→5% 이상은 6개월 재직 중 결과인데 — 본인이 바꾼 것 3가지를 순서대로, 그리고 어떻게 측정했나요?", pass: "타깃·소재·구조 변경을 본인 손으로 설명 + 측정 방법", red: "팀 결과를 본인 것으로 / 측정 기준 모호" },
+    { text: "(0→1) 뮤즈블라썸에서 3개월 만에 GA4·기술 SEO·블로그·자동화를 세팅하셨죠 — 저희 인스타·블로그를 처음부터 다시 세운다면 첫 4주에 뭘 어떤 순서로 하겠어요?", pass: "진단→템플릿→발행 리듬→지표 순서가 구체적", red: "일반론 / 광고부터" },
+    { text: "(숫자) 튜닙·감성커피에서 인스타를 운영할 때 가장 잘된 게시물과 안 된 게시물 — 차이를 도달·저장 숫자로 설명해 주세요.", pass: "지표로 원인 설명", red: "느낌·조회수만" },
+    { text: "(동기) 그룹바이 프로필에는 IT·AI 산업 지향이 적혀 있는데 — 왜 건강기능식품, 암 환우 브랜드인가요?", pass: "코메디닷컴 건강 콘텐츠 경험과 연결된 구체적 동기", red: "'어디서든 성장' 수준" },
+  ],
+  "안정은": [
+    { text: "(본인 기여) 얼라이브커뮤니티 콘텐츠 61건 중 본인이 직접 기획·제작한 것만 골라 보여주세요. 기획·촬영·편집·카피 중 어디까지가 본인 손이었나요?", pass: "본인 몫이 건별로 명확", red: "'팀으로 같이 했다'만 반복" },
+    { text: "(제작 손) 개인 인스타 게시물 하나를 만드는 과정을 — 툴, 걸린 시간, 레퍼런스까지. 가능하면 저희 카드뉴스 1장 문구를 지금 고쳐 봐 주세요.", pass: "캔바·캡컷 직접 사용 + 빠르고 정확한 수정", red: "툴 미숙 / 레퍼런스 베끼기" },
+    { text: "(숫자) 최고 조회 8,043 게시물과 평균 게시물의 차이는 뭐였나요? 저장·공유·팔로우 전환은 어땠나요?", pass: "지표로 원인을 설명", red: "조회수만 앎" },
+    { text: "(표현 안전) 암 환우와 가족이 보는 계정입니다 — 밈 릴스 문법을 그대로 쓰면 안 되는 이유와, 쓰면 안 되는 표현을 예로 들어 주세요.", pass: "톤 조절 인지 + 질병 치료·예방 표현 회피", red: "재미 우선 / 표현 리스크 인식 없음" },
+    { text: "(VOC→기획) 102명 인터뷰를 3가지 문제로 분류하셨죠 — 저희에게 상담 5,000명 기록이 있다면 콘텐츠 주제를 어떻게 뽑겠어요?", pass: "고객 문제→주제 매트릭스가 구체적", red: "일반론" },
+    { text: "(조건) 이번 공고는 경력 3년 이상 기준입니다. 첫 3개월 계약 기간에 무엇으로 증명하겠어요? 3개월 계약 후 정규직 전환 조건은 괜찮으신가요?", pass: "측정 가능한 목표 + 조건 수용", red: "막연함 (※ 연봉·직급 숫자 언급 금지 — 2차 후 서면)" },
+    { text: "(근속·고객 접점) 소마미술관에서 1년 9개월 일하셨는데 — 현장 응대에서 배운 것이 콘텐츠에 어떻게 이어지나요?", pass: "고객 이해→콘텐츠 연결이 구체적", red: "관련 없음" },
   ],
   "김소영": [
     { text: "(최초반 선고지) 연봉을 '면접 후 결정'으로 두셨는데, 저희 레인지는 상한 5,500입니다. 희망 숫자를 먼저 여쭤봐도 될까요?", pass: "숫자를 명확히 말하고 레인지 안에서 정렬", red: "끝까지 숫자 회피 / 레인지 위 기대 (※ 즉석 인상 발언 금지)" },
@@ -1783,6 +1858,32 @@ const CAREER_BUILTIN = {
     ],
     note: "🗓 물류 면접 9/7 12:00 · 직전 4,100/희망 4,000~5,000 · ✅이카운트 구축력+LOT·유효기간 관리(의료기기→식품 유통기한과 동일 문법)+위탁재고 · ⚠관문: 브이플랫폼 2개월 사유",
   },
+  "백인준": {
+    edu: "성공회대 사회학·정치학 복수전공 졸업(2016) · 패스트캠퍼스 디지털 마케팅 스쿨 수료 · GAIQ(2024.12)",
+    header: "총 5년 9개월(8개사) — 건강 미디어 에디터 출신 콘텐츠·PR·뉴스레터·기술 SEO 제너럴리스트 · 희망 4,000 · ⚠ 9개월 이하 재직 5곳",
+    rows: [
+      { company: "뮤즈블라썸", role: "마케팅 리드 (계약직)", period: "2026.06~2026.08", dur: "3개월 ⚠", work: "제로베이스 마케팅 세팅: GA4·GTM, 기술 SEO(canonical·사이트맵·색인), 블로그·SEO 콘텐츠, Meta 영상 소재 직접 제작(CTR 3.7%), 콜드메일·보고 자동화" },
+      { company: "㈜펀진", role: "마케터 대리 (B2B·AI)", period: "2024.06~2025.07", dur: "1년 2개월", work: "박람회 총괄(KADEX·AI EXPO·CES), 보도자료 10건+ 기사화, 월간 뉴스레터 오픈율 38%+" },
+      { company: "㈜아이티데스크", role: "마케터 대리", period: "2023.02~2023.07", dur: "6개월 ⚠", work: "DA 광고비 월 600→300만, CTR 0.23%→5%+, 뉴스레터 오픈율 10→40%" },
+      { company: "튜닙", role: "콘텐츠 마케터", period: "2022.05~2022.08", dur: "4개월 ⚠", work: "인스타그램 운영·DA 소재 기획, Metaverse Expo 부스" },
+      { company: "크로스오버커뮤니케이션", role: "광고기획(AE)", period: "2021.05~2021.08", dur: "4개월 ⚠", work: "감성커피 SNS 운영, 병원 바이럴(네이버 View 10위권), 제안서" },
+      { company: "포티투마루", role: "제휴산업팀", period: "2020.04~2021.04", dur: "1년 1개월", work: "IITP 정부과제 제안·관리, 산업 박람회" },
+      { company: "㈜코리아메디케어(코메디닷컴)", role: "콘텐츠팀", period: "2017.11~2019.02", dur: "1년 4개월", work: "**건강 전문 미디어** — 네이버 포스트 1.8만→4만, 13만 구독 건강 뉴스레터 주 4회, 올해의 건강 10대 포스트" },
+      { company: "㈜시사통", role: "팟캐스트 PD", period: "2016.05~2017.01", dur: "9개월", work: "기획·섭외·녹음·편집, 일 다운로드 5만·차트 5위권" },
+    ],
+    note: "🗓 면접 10/6(화) 15:00 · 열방약국으로 방문(그룹바이 스카우트→커피챗) · ✅ 건강 정보 번역력(코메디닷컴)+0→1 마케팅 세팅·자동화 · ⚠ 관문: 근속 패턴 + 카드뉴스·이미지 직접 제작 실물",
+  },
+  "안정은": {
+    edu: "서경대 문화콘텐츠학과 졸업(2024.02, 학점 4.13)",
+    header: "신입(정규 경력 없음) — 팀 프로젝트 SNS 콘텐츠 61건 참여(누적 96만)·고객 인터뷰 102건·개인 인스타 운영 · ⚠ 공고 요건(경력 3~6년) 미충족",
+    rows: [
+      { company: "개인 인스타그램 채널", role: "기획·제작·운영", period: "2026.08~현재", dur: "진행 중", work: "개설 11일 만에 팔로워 209, 최고 조회 8,043" },
+      { company: "얼라이브커뮤니티 (프로젝트)", role: "콘텐츠 기획(팀)", period: "2026.06~2026.07", dur: "약 2개월", work: "2030 인터뷰 102건 → 유튜브+인스타 릴스 2채널 전략, 팀 콘텐츠 61건 누적 96만, 프로젝트 1위" },
+      { company: "소마미술관", role: "인포메이션·전시운영(아르바이트)", period: "2024.09~2026.05", dur: "1년 9개월", work: "관람객 응대·안내·민원 — 고객 접점 현장" },
+      { company: "㈜슈필렌", role: "행사기획 인턴", period: "2023.12~2024.02", dur: "3개월", work: "축제 프로그램 기획" },
+    ],
+    note: "🗓 1차 실무 면접(일정 확인 필요) · ✅ 사전조사(상담 5,000명 언급)+VOC 인터뷰 기반 기획+릴스 포맷 분석 · ⚠ 관문: 팀 성과 중 본인 기여 분리, 제작 손 실물, 경력 요건 미충족 → 통과 시 대표가 신입 트랙 여부 결정",
+  },
   "강한별": {
     birth: 1997, edu: "건국대(서울) 산업융합학과 재학중(공급망관리·빅데이터) · 3톤 지게차 · OA 자격 5종 전부 A등급 · JLPT N5",
     header: "총 7년 10개월 — 건기식 SCM 직경험+쿠팡 밀크런+현장·사무 겸장 · 성북구 안암 · ⚠최근 3개사 7·11·8개월",
@@ -1950,6 +2051,26 @@ const FOCUS_BUILTIN = {
       ["✅ 겸장·조건", "지게차 3톤+OA 5종 A등급 = 1인 물류(현장+사무) 최적 체형. 희망 3,600~3,800 예산 정합. 건국대 재학(공급망) 병행 계획 확인"],
     ],
   },
+  "백인준": {
+    verdict: "판정 기준: ①근속 패턴(10년 8개사·9개월 이하 5곳) 납득 + ②카드뉴스·피드 이미지 '직접 제작' 실물 — 통과 시 건강 정보 번역력과 GEO/SEO·자동화를 갖춘 글·체계형 카드",
+    points: [
+      ["🔑 근속 (최초반)", "튜닙 4개월·크로스오버 4개월·아이티데스크 6개월·뮤즈블라썸 3개월 계약 — 회사별 사유를 하나씩. 뮤즈블라썸 계약 뒤 전환이 안 된 이유가 핵심(우리도 3개월 계약→전환)"],
+      ["🔑 제작 손", "스킬 목록에 Figma만 — 카드뉴스·피드 이미지를 혼자 만드는 툴과 속도를 포트폴리오로 확인. 'Meta 영상 소재 직접 제작'의 실물"],
+      ["✅ 건강 정보 번역력", "코메디닷컴 건강 에디터 — 네이버 포스트 1.8만→4만, 올해의 건강 10대 포스트, 13만 구독 뉴스레터. 공고 필수 역량①과 일치"],
+      ["✅ 0→1·체계화", "3개월에 GA4·GTM·기술 SEO·블로그·콜드메일·보고 자동화 구축 — 우대 2개(0→1, 운영 체계)와 '콘텐츠 DB·AI 자동화'에 부합"],
+      ["동기·조건", "그룹바이 프로필은 IT·AI 산업 지향 — 왜 건기식·암 환우 브랜드인가. 희망 4,000(레인지 안). 경력 5년 9개월 → 직급 기준상 선임매니저"],
+    ],
+  },
+  "안정은": {
+    verdict: "판정 기준: ①팀 프로젝트(61건·96만) 중 '본인이 만든 것' 분리 + ②현장 제작 손(카드뉴스 1장) — 경력 요건 미충족이라 1차 통과 시 대표가 신입 트랙 여부를 따로 결정",
+    points: [
+      ["🔑 본인 기여 분리", "얼라이브커뮤니티 61건 중 본인이 기획·제작한 콘텐츠를 화면으로 — 기획만 했는지, 편집까지 했는지"],
+      ["🔑 제작 손 현장 확인", "개인 인스타(개설 11일·팔로워 209·최고 8,043) 제작 과정·툴·소요 시간. 가능하면 카드뉴스 1장 문구 수정 시연"],
+      ["✅ 고객 인터뷰→기획", "2030 102명 인터뷰로 문제 분류(31·29·19명) → 2채널 전략. VOC 기반 기획은 우리 상담 5,000명 자산과 맞음"],
+      ["✅ 사전조사", "지원동기에 '5,000명 이상 상담' 언급 — 우리 콘텐츠를 읽고 옴. 우리 인스타를 보고 첫 달에 뭘 바꿀지 물어보기"],
+      ["⚠ 조건", "정규 경력 없음 — 공고(경력 3~6년)와 다름. 연봉·직급은 1차에서 언급 금지, 2차 전에 대표가 신입 레인지를 결정"],
+    ],
+  },
   "김소영": {
     verdict: "판정 기준: ①경력 구성(지원서 뉴트리엄 3.8y vs 포트폴리오 국내 4개사) 정합 + ②성과 규모의 실체 — 통과 시 주니어 실행 트랙 후보",
     points: [
@@ -2031,6 +2152,51 @@ const SEED_CANDIDATES_5 = [
     id: "seed_khb_0907", positionId: "p_logi", name: "강한별", age: 29, channel: "사람인", stage: "면접",
     resume: "[물류 면접 9/8 5시(오후 추정·확인)]\n총 7y10m · 성북구 안암 · 희망 3,600~3,800(예산 정합)\n옵티머스솔루션스 11개월 — 건강기능식품 SCM(3PL 핸들링·B2B 발주) / 리샘 — 쿠팡 밀크런 납품 세팅 / 지게차 3톤+OA 5종 A등급(1인 물류 겸장)\n⚠최근 3개사 7·11·8개월 — 최초반 확인\n상세는 앱 내장 경력카드",
     files: [], fileNames: ["강한별_이력서.pdf"],
+  },
+];
+// ─── 09.29 콘텐츠 마케터 면접자 (백인준·안정은) — 기존 '컨텐츠/콘텐츠 마케터' 포지션에 붙임, 없으면 새로 만듦 ─────────
+const CONTENT_JD = `직무명: SNS 콘텐츠 마케터 (큐라엘)
+공고: 잡코리아 GI_Read/50029275 · 사람인 55132796·55065781 · 그룹바이 '[큐라엘] SNS 콘텐츠 마케터 (식품/건기식 · 연차 무관 실무형)'
+
+직무 소개:
+큐라엘의 건강·제품 정보를 고객이 신뢰할 수 있는 콘텐츠로 전달하며, 전문성을 바탕으로 SNS 콘텐츠를 기획하고 직접 제작합니다. 인스타그램, 블로그, 숏폼 등 주요 채널의 운영 방향과 콘텐츠 전략을 수립합니다. 기획부터 제작, 발행, 성과 분석과 개선까지 주도적으로 이끌며, 아직 정형화되지 않은 채널과 콘텐츠 운영 체계를 처음부터 함께 만들어갈 분을 찾습니다.
+
+주요 업무:
+- SNS 채널 운영 관리(인스타그램, 쓰레드, 틱톡, 블로그 등)
+- 콘텐츠 기획 및 이미지 제작(카드뉴스, 피드, 보도 자료 등)
+- 인플루언서, 체험단 및 이벤트·시즌 캠페인 운영
+- 검색 노출 및 콘텐츠 성과 분석·리서치
+- 콘텐츠 DB 구축·AI 자동화
+
+최소 경력: 3년 이상 ~ 6년 이하 (그룹바이 공고는 '연차 무관 실무형')
+
+필수 역량:
+- 건강·기능식품 등 큐라엘의 사업 분야를 이해하고, 전문적인 정보를 정확하게 콘텐츠로 풀어낼 수 있는 분
+- 카드뉴스, 피드 이미지, 블로그 등 글과 이미지 중심의 콘텐츠를 직접 제작할 수 있는 분
+- 콘텐츠 발행 후 도달·저장·공유·유입 등의 성과를 확인하고 개선할 수 있는 분
+
+우대 사항:
+- 브랜드 또는 SNS 채널을 '0에서 1'로 직접 구축한 경험이 있는 분
+- 콘텐츠 DB, 제작 프로세스, 성과관리 지표 등 콘텐츠 운영 체계를 구축한 경험이 있는 분
+
+근무 조건: 3개월 계약직 후 정규직 전환 가능 · 큐라엘 본사(강남구 논현로132길 12, 2층 · 7호선 학동역 100m) · 09:00~18:00 주 5일 · 연봉 회사 내규(면접 후 결정)
+제출 서류: 이력서, 자기소개서, 포트폴리오
+
+우리가 일하는 방식: 신뢰(고객이 믿고 선택할 수 있게) · 고객중심('고객에게 도움이 되는가') · 학습 · 성장 · 실행력(지금 할 수 있는 최우선 순위를 바로 실행)
+이런 분과 함께하고 싶습니다: 큰 조직의 부속이 아니라 직접 만들어가는 일을 하고 싶은 분 / 헬스케어·건강 분야에 진심으로 동기부여가 되는 분 / 빠르게 성장하는 환경에서 본인의 역할을 스스로 정의하고 싶은 분
+
+전형: 1차 실무 면접(공통 평가 7항목) → 통과자만 2차 대표 면접`;
+const SEED_POSITION_CONTENT = { id: "p_content", name: "컨텐츠 마케터", colorIdx: 2, jd: CONTENT_JD };
+const SEED_CANDIDATES_6 = [
+  {
+    id: "seed_bij_0929", name: "백인준", channel: "그룹바이", stage: "면접",
+    resume: "[면접 10/6(화) 15:00 — 그룹바이 스카우트 → 커피챗 수락, 열방약국으로 방문]\n총 5년 9개월(8개사) · 희망 연봉 4,000 · 서울\n코메디닷컴 건강 전문 미디어 콘텐츠팀 1y4m — 네이버 포스트 1.8만→4만, 13만 구독 건강 뉴스레터 주 4회, 올해의 건강 10대 포스트\n뮤즈블라썸 마케팅 리드(계약 3개월) — GA4·GTM, 기술 SEO, 블로그, Meta 영상 소재 직접 제작(CTR 3.7%), 콜드메일·보고 자동화\n펀진(B2B·AI) 1y2m — 박람회 총괄, 보도자료 10건+, 뉴스레터 오픈율 38%+ / 아이티데스크 6개월 — CTR 0.23%→5%+, 뉴스레터 10→40%\n⚠ 9개월 이하 재직 5곳 · 스킬에 Figma만(이미지 직접 제작 확인 필요)\n포트폴리오: portfolio-neon-two-u74mb384ps.vercel.app\n상세는 앱 내장 경력카드·중점포인트 참조",
+    files: [], fileNames: ["콘텐츠를 중심으로 온라인과 오프라인을 넘나들며 실행해 온 제너럴리스트 마케터 백인준입니다.pdf"],
+  },
+  {
+    id: "seed_aje_0929", name: "안정은", channel: "기타", stage: "면접",
+    resume: "[1차 실무 면접 예정 — 일정 확인 필요]\n신입(정규 경력 없음) · 서경대 문화콘텐츠학과 졸업(2024.02)\n얼라이브커뮤니티 프로젝트(2026.06~07) — 2030 인터뷰 102건 → 유튜브+인스타 릴스 2채널 전략, 팀 콘텐츠 61건 누적 96만, 프로젝트 1위\n개인 인스타그램(2026.08~) — 개설 11일 팔로워 209, 최고 조회 8,043\n소마미술관 인포메이션·전시운영 1y9m(아르바이트) / 슈필렌 행사기획 인턴 3개월\n⚠ 공고 경력 요건(3~6년) 미충족 — 팀 성과 중 본인 기여 분리 필요\n상세는 앱 내장 경력카드·중점포인트 참조",
+    files: [], fileNames: ["안정은_마케팅_지원서.pdf"],
   },
 ];
 function FocusCard({ candidate, compact }) {
@@ -2598,10 +2764,27 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
   const [decision, setDecision] = useState(null);
   const [comment, setComment] = useState("");
   const [evals, setEvals] = useState({});
+  const [r1Scores, setR1Scores] = useState({});
+  const [r1Flags, setR1Flags] = useState([]);
+  const [r1Memo, setR1Memo] = useState("");
+  const [r1Open, setR1Open] = useState(true);
   const pollRef = useRef(null);
   const lastSavedRef = useRef("");
+  const r1LoadedRef = useRef(false);
 
   useEffect(() => { const e = getEvaluator(); setEv(e); setNameInput(e.name || ""); }, []);
+  useEffect(() => {
+    if (r1LoadedRef.current) return;
+    const mine = evals[ev.id];
+    if (mine && mine.rubric) {
+      r1LoadedRef.current = true;
+      setR1Scores(mine.rubric.scores || {});
+      setR1Flags(mine.rubric.flags || []);
+      setR1Memo(mine.rubric.memo || "");
+    }
+  }, [evals, ev.id]);
+  const r1Filled = R1_AXES.filter(([k]) => Number(r1Scores[k]) >= 1).length;
+  const r1MyTotal = r1Total(r1Scores);
 
   const fetchEvals = async () => {
     if (!syncEnabled || !roomId) return;
@@ -2623,9 +2806,13 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
 
   const submit = async () => {
     if (!decision) { showToast("합격 / 보류 / 불합격 중 하나를 선택하세요", "error"); return; }
+    if (r1Filled > 0 && r1Filled < R1_AXES.length) { showToast(`1차 평가 7항목을 모두 채점해 주세요 (${r1Filled}/7) — 안 쓸 거면 전부 비워 두세요`, "error"); return; }
+    const extremes = R1_AXES.filter(([k]) => [1, 5].includes(Number(r1Scores[k])));
+    if (r1Filled === R1_AXES.length && extremes.length > 0 && !(r1Memo || "").trim()) { showToast("1점·5점을 준 항목이 있어요 — 근거 메모를 한 줄 적어 주세요", "error"); return; }
     const name = (nameInput || "면접관").trim();
     setEvaluatorName(name);
     const payload = { name, decision, comment: (comment || "").trim(), ts: Date.now() };
+    if (r1Filled === R1_AXES.length) payload.rubric = { v: 1, scores: { ...r1Scores }, flags: [...r1Flags], memo: (r1Memo || "").trim(), total: r1Total(r1Scores) };
     if (syncEnabled && roomId) {
       try {
         const r = await fetch(`/api/eval?roomId=${roomId}&candidateId=${candidate.id}&evaluatorId=${ev.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -2657,6 +2844,18 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
   }, [liveSig, savedSig, isHost, total]);
   const rs = DEC_STYLE[result] || DEC_STYLE.보류;
   const fd = candidate.finalDecision;
+  // 독립 채점: 공동 평가 중에는 내 평가를 제출해야 다른 면접관의 표·점수가 보인다
+  const revealed = !syncEnabled || !!evals[ev.id];
+  const r1 = r1Summary(evals);
+  const copyR1 = async () => {
+    const text = r1ReportText(candidate, position, evals);
+    try { await navigator.clipboard.writeText(text); showToast("대표 전달용 요약을 복사했어요"); }
+    catch (e) {
+      const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); showToast("대표 전달용 요약을 복사했어요"); } catch (_) { showToast("복사하지 못했어요 — 화면의 요약을 직접 선택해 복사해 주세요", "error"); }
+      document.body.removeChild(ta);
+    }
+  };
 
   return (
     <div>
@@ -2708,6 +2907,39 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
           <div style={Card}>
             <div style={{ fontSize: 13, fontWeight: 600, color: C.sub, marginBottom: 12 }}>🗳 내 평가</div>
             <input value={nameInput} onChange={e => setNameInput(e.target.value)} placeholder="내 이름 (면접관)" style={{ ...IS, marginBottom: 10 }} />
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: 9, marginBottom: 10, background: C.surface }}>
+              <button onClick={() => setR1Open(o => !o)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "transparent", border: "none", padding: "9px 11px", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>📋 1차 실무 공통 평가</span>
+                <span style={{ fontSize: 11, color: C.muted }}>{r1Filled}/7</span>
+                <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, fontFamily: "'DM Mono',monospace", color: r1MyTotal != null ? sc(r1MyTotal) : C.muted }}>{r1MyTotal != null ? `${r1MyTotal}점` : "—"}</span>
+                <span style={{ fontSize: 11, color: C.muted }}>{r1Open ? "▲" : "▼"}</span>
+              </button>
+              {r1Open && <div style={{ padding: "0 11px 11px" }}>
+                <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5, marginBottom: 8 }}>5 증거까지 보여줌 · 4 충족+일부 증거 · 3 말은 맞지만 증거 약함 · 2 모호·남의 일 · 1 근거 없음. ★ 치명 항목(평균 2.5 미만이면 탈락)</div>
+                {R1_AXES.map(([k, label, w, crit, hint], i) => { const v = Number(r1Scores[k]) || 0; return (
+                  <div key={k} style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{"①②③④⑤⑥⑦"[i]} {label}{crit ? " ★" : ""}</span>
+                      <span style={{ fontSize: 10, color: C.muted }}>×{w}</span>
+                    </div>
+                    <div style={{ fontSize: 10.5, color: C.muted, margin: "1px 0 4px", lineHeight: 1.4 }}>{hint}</div>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {[1, 2, 3, 4, 5].map(n => { const on = v === n; return (
+                        <button key={n} onClick={() => setR1Scores(p => ({ ...p, [k]: p[k] === n ? 0 : n }))} aria-label={`${label} ${n}점`} style={{ flex: 1, padding: "5px 0", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: on ? C.accent : C.card, color: on ? "#fff" : C.sub, border: `1px solid ${on ? C.accent : C.border}` }}>{n}</button>
+                      ); })}
+                    </div>
+                  </div>
+                ); })}
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, margin: "10px 0 5px" }}>레드플래그 (해당 시 체크)</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                  {R1_FLAGS.map(f => { const on = r1Flags.includes(f); return (
+                    <button key={f} onClick={() => setR1Flags(p => on ? p.filter(x => x !== f) : [...p, f])} style={{ padding: "3px 9px", borderRadius: 12, fontSize: 11, cursor: "pointer", fontFamily: "inherit", background: on ? DEC_STYLE.불합격.bg : "transparent", color: on ? DEC_STYLE.불합격.c : C.sub, border: `1px solid ${on ? DEC_STYLE.불합격.b : C.border}` }}>{on ? "⚑ " : ""}{f}</button>
+                  ); })}
+                </div>
+                <textarea value={r1Memo} onChange={e => setR1Memo(e.target.value)} placeholder="근거 메모 — 1점·5점 준 항목은 '후보가 한 말/보여준 것' 한 줄 필수" rows={2} style={{ ...IS, resize: "vertical", fontSize: 12 }} />
+              </div>}
+            </div>
+            <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 5 }}>1차 실무 면접에서 합격 = 2차 대표 면접 추천</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 7, marginBottom: 10 }}>
               {["합격", "보류", "불합격"].map(d => { const s = DEC_STYLE[d]; const on = decision === d; return (
                 <button key={d} onClick={() => setDecision(d)} style={{ padding: "10px 0", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: on ? s.bg : "transparent", border: `1px solid ${on ? s.b : C.border}`, color: on ? s.c : C.sub }}>{d}</button>
@@ -2720,26 +2952,56 @@ function DecisionRoom({ candidate, position, isHost, roomId, syncEnabled, genLoa
           <div style={Card}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>👥 합의 보드 ({total}표 · AI 포함)</span>
-              <span style={{ padding: "4px 12px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: rs.bg, border: `1px solid ${rs.b}`, color: rs.c }}>결과: {result}</span>
+              {revealed && <span style={{ padding: "4px 12px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: rs.bg, border: `1px solid ${rs.b}`, color: rs.c }}>결과: {result}</span>}
             </div>
-            <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+            {!revealed && <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.6, padding: "9px 11px", background: C.surface, borderRadius: 7, border: `1px dashed ${C.border}`, marginBottom: 10 }}>🔒 독립 채점 — 내 평가를 먼저 제출하면 다른 면접관의 표와 점수가 보여요. 지금은 누가 제출했는지만 표시됩니다.</div>}
+            {revealed && <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
               {["합격", "보류", "불합격"].map(d => <div key={d} style={{ flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 7, background: C.surface, border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: DEC_STYLE[d].c }}>{tally[d]}</div>
                 <div style={{ fontSize: 11, color: C.muted }}>{d}</div>
               </div>)}
-            </div>
+            </div>}
             {rows.length === 0 ? <div style={{ textAlign: "center", padding: "14px 0", color: C.muted, fontSize: 12 }}>아직 제출된 평가가 없습니다</div>
-              : rows.map(r => { const s = DEC_STYLE[r.decision] || {}; return (
+              : rows.map(r => { const s = DEC_STYLE[r.decision] || {}; const rt = r.rubric ? r1Total(r.rubric.scores) : null; return (
                 <div key={r.id} style={{ padding: "9px 11px", background: r.isAI ? "rgba(139,92,246,.08)" : C.surface, borderRadius: 7, border: `1px solid ${r.isAI ? "rgba(139,92,246,.35)" : C.border}`, marginBottom: 6 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: r.isAI ? C.purple : C.text }}>{r.isAI ? "🤖 AI 면접관" : (r.name || "면접관")}</span>
                     {r.isAI && <span style={{ fontSize: 9, fontWeight: 700, color: C.purple, background: "rgba(139,92,246,.15)", border: "1px solid rgba(139,92,246,.3)", padding: "1px 6px", borderRadius: 8 }}>AI</span>}
-                    <span style={{ marginLeft: "auto", padding: "2px 9px", borderRadius: 12, fontSize: 11, fontWeight: 700, background: s.bg, border: `1px solid ${s.b}`, color: s.c }}>{r.decision}</span>
+                    {revealed && rt != null && <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono',monospace", color: sc(rt) }}>1차 {rt}점</span>}
+                    {revealed ? <span style={{ marginLeft: "auto", padding: "2px 9px", borderRadius: 12, fontSize: 11, fontWeight: 700, background: s.bg, border: `1px solid ${s.b}`, color: s.c }}>{r.decision}</span>
+                      : <span style={{ marginLeft: "auto", fontSize: 11, color: C.muted }}>제출함</span>}
                   </div>
-                  {r.comment && <div style={{ fontSize: 12, color: C.sub, marginTop: 5, lineHeight: 1.5 }}>{r.comment}</div>}
+                  {revealed && r.comment && <div style={{ fontSize: 12, color: C.sub, marginTop: 5, lineHeight: 1.5 }}>{r.comment}</div>}
+                  {revealed && r.rubric?.flags?.length > 0 && <div style={{ fontSize: 11, color: DEC_STYLE.불합격.c, marginTop: 4 }}>⚑ {r.rubric.flags.join(" · ")}</div>}
                 </div>
               ); })}
           </div>
+
+          {revealed && r1 && (() => { const vs = R1_VERDICT_STYLE[r1.verdict] || DEC_STYLE.보류; return (
+            <div style={Card}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.sub }}>📊 1차 집계 → 2차 추천 판정 ({r1.n}명 채점)</span>
+                <span style={{ padding: "4px 12px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: vs.bg, border: `1px solid ${vs.b}`, color: vs.c }}>{r1.verdict}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 26, fontWeight: 800, fontFamily: "'DM Mono',monospace", color: sc(r1.avgTotal) }}>{r1.avgTotal}</span>
+                <span style={{ fontSize: 12, color: C.muted }}>평균 환산 점수 · {r1.totals.map(t => `${t.name} ${t.total}`).join(" · ")}</span>
+              </div>
+              {r1.perAxis.map((a, i) => (
+                <div key={a.k} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                  <span style={{ width: 150, fontSize: 11.5, color: a.crit ? C.text : C.sub, fontWeight: a.crit ? 700 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{"①②③④⑤⑥⑦"[i]} {a.label}{a.crit ? " ★" : ""}</span>
+                  <div style={{ flex: 1, height: 6, background: C.surface, borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ width: `${a.avg / 5 * 100}%`, height: "100%", background: a.crit && a.avg < 3 ? C.red : `linear-gradient(90deg,${C.accent},${C.teal})` }} />
+                  </div>
+                  <span style={{ width: 28, textAlign: "right", fontSize: 11.5, fontWeight: 700, fontFamily: "'DM Mono',monospace", color: C.text }}>{a.avg}</span>
+                </div>
+              ))}
+              {r1.spread >= 20 && <div style={{ fontSize: 12, color: DEC_STYLE.보류.c, background: DEC_STYLE.보류.bg, border: `1px solid ${DEC_STYLE.보류.b}`, borderRadius: 7, padding: "7px 10px", marginTop: 8 }}>면접관 간 점수 차 {r1.spread}점 — 10분 합의 대화 후 결과와 이견을 메모에 남겨 주세요</div>}
+              {r1.flags.length > 0 && <div style={{ fontSize: 12, color: DEC_STYLE.불합격.c, marginTop: 8 }}>⚑ 레드플래그: {r1.flags.join(", ")}</div>}
+              <div style={{ fontSize: 10.5, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>2차 추천 = 평균 70↑ · 치명 항목(①⑦) 평균 3.0↑ · 불합격 표 0 · 레드플래그 0 / 탈락 = 평균 60 미만 · 치명 평균 2.5 미만 · 불합격 과반 / 그 외 보류(대표 판단)</div>
+              <button onClick={copyR1} style={{ ...BP(), width: "100%", marginTop: 10 }}>📋 대표 전달용 요약 복사</button>
+            </div>
+          ); })()}
 
           {isHost && <div style={{ fontSize: 11, color: C.muted, textAlign: "center", padding: "4px 0" }}>표가 바뀌면 후보 카드에 자동 반영됩니다 · 사람 표 우선(동점만 AI가 결정)</div>}
           {!isHost && <div style={{ fontSize: 11, color: C.muted, textAlign: "center", padding: "4px 0" }}>방장 화면에서 최종 결과가 후보 카드에 반영됩니다</div>}
@@ -3356,6 +3618,26 @@ export default function HireL() {
       localStorage.setItem("seed_logi_0907_done", "1");
     } catch (e) {}
   }, []);
+
+  // 09.29 콘텐츠 마케터 면접자(백인준·안정은) — 포지션 목록이 로드된 뒤 1회만 병합
+  // 기존에 '컨텐츠/콘텐츠' 이름의 포지션이 있으면 거기에 붙이고, JD가 비었거나 '미정'이면 공고 JD로 채움
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("seed_content_0929_done") === "1") return;
+      if (!Array.isArray(positions) || positions.length === 0) return;
+      const target = positions.find(p => p && /컨텐츠|콘텐츠/.test(p.name || ""));
+      const pid = target ? target.id : SEED_POSITION_CONTENT.id;
+      setPositions(p => {
+        if (!p.some(x => x && x.id === pid)) return [...p, SEED_POSITION_CONTENT];
+        return p.map(x => (x && x.id === pid && (!(x.jd || "").trim() || (x.jd || "").trim() === "미정")) ? { ...x, jd: CONTENT_JD } : x);
+      });
+      setCandidates(p => {
+        const missing = SEED_CANDIDATES_6.filter(s => !p.some(c => c && (c.name || "").trim() === s.name)).map(s => ({ ...s, positionId: pid }));
+        return missing.length ? [...p, ...missing] : p;
+      });
+      localStorage.setItem("seed_content_0929_done", "1");
+    } catch (e) {}
+  }, [positions]);
 
   // 09.01 물류 면접자(이재혁·이재희) + 물류 포지션 자동 추가 — 1회만 병합
   useEffect(() => {
@@ -4076,11 +4358,11 @@ export default function HireL() {
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>📎 첨부 자료 <span style={{ fontWeight: 400, color: C.muted }}>· 원본은 사내 폴더 보관, 여기엔 경로만</span></div>
                     <FileRefsSection candidate={c} onUpdate={fr => updateCandidate(c.id, { fileRefs: fr })} showToast={showToast} />
                   </div>
-                  {a && !busy && (
+                  {!busy && (
                     <div style={{ marginBottom: 18 }}>
                       <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>🗳 면접 결과 · 합의</span>
-                        <button onClick={() => { setDecisionCandidateId(c.id); setView("decision"); }} style={{ marginLeft: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 12px", color: C.sub, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>합의·결정 화면 열기 →</button>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>🗳 1차 평가 · 합의</span>
+                        <button onClick={() => { setDecisionCandidateId(c.id); setView("decision"); }} style={{ marginLeft: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 12px", color: C.sub, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>평가·합의 화면 열기 →</button>
                       </div>
                       <DecisionSummary candidate={c} />
                       <div style={{ marginTop: 10 }}>
